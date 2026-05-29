@@ -1,4 +1,12 @@
 AI Study Hub - API Convention
+0. # Environment Variables
+ Phải cấu hình biến môi trường
+```env
+DB_URL=jdbc:mysql://shinkansen.proxy.rlwy.net:11782/ai_study_hub
+DB_USERNAME=root
+DB_PASSWORD=qJVMgIyQYDLoqlgPtfDsxmNwyYVsmfub
+JWT_SIGNER_KEY=4267cf243b7a2ad00ff79b7b9fd443f491cefe5fb8ed59ef9d9d010b80e7df4b
+```
 1. ## Base URL
    Local Environment:http://localhost:8080/api/v1
 2. ## Response Format
