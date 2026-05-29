@@ -142,7 +142,7 @@ Example:
 Example:
 
 ```java
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN')") 
 ```
 
 ---

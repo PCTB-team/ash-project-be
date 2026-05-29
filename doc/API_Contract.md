@@ -20,6 +20,8 @@ ADMIN
 Authorization: Bearer <token>
 ```
 
+### Request
+
 ### Success Response
 
 ```json
@@ -32,9 +34,7 @@ Authorization: Bearer <token>
       "username": "admin",
       "fullname": "Administrator",
       "email": "admin@gmail.com",
-      "roles": [
-        "ADMIN"
-      ]
+      "roles": ["ADMIN"]
     }
   ]
 }
