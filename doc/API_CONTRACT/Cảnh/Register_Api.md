@@ -20,6 +20,7 @@ Content-Type: application/json
 ```json
 {
   "username": "bin123",
+  "fullname": "TaquangCanh",
   "email": "user@example.com",
   "password": "Password@123",
   "confirmPassword": "Password@123"
@@ -41,6 +42,7 @@ Content-Type: application/json
   "code": 1000,
   "message": "Register successfully. Please verify your email",
   "result": {
+    "fullname": "TaquangCanh",
     "email": "user@example.com",
     "username": "bin123"
   }
