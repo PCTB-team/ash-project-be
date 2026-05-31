@@ -1,7 +1,7 @@
 ## Send OTP
 
 ### Endpoint
-
+ 
 ```http
 POST /auth/send-otp
 ```
