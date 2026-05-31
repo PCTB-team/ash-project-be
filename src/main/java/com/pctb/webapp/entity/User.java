@@ -36,5 +36,6 @@ public class User {
     )
     Set<Role> roles;
 
-
+    @Column(nullable = false)
+    boolean verified = false; /// Dùng để theo dõi trạng thái xác thực của user.
 }
