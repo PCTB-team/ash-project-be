@@ -1,5 +1,6 @@
 package com.pctb.webapp.controller;
 
+import com.pctb.webapp.dto.request.GoogleLoginRequest;
 import com.pctb.webapp.dto.request.LoginRequest;
 import com.pctb.webapp.dto.request.LogoutRequest;
 import com.pctb.webapp.dto.request.RegisterRequest;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -50,4 +50,6 @@ public class AuthenController {
                 .result(LogoutResponse.builder().loggedOut(true).build())
                 .build();
     }
+
+
 }

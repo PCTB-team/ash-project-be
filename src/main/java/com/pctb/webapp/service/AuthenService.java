@@ -31,6 +31,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 
+
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -74,6 +75,8 @@ public class AuthenService {
     @NonFinal
     @Value("${jwt.loginAttemptWindowSeconds:300}")
     long loginAttemptWindowSeconds;
+
+
 
     public RegisterResponse register(RegisterRequest request) {
         if (userRepo.existsByEmail(request.getEmail())) {
@@ -274,4 +277,5 @@ public class AuthenService {
     private String blacklistKey(String accessToken) {
         return BLACKLIST_PREFIX + accessToken;
     }
+
 }
