@@ -24,6 +24,9 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -37,6 +40,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenService {
+    static String LOGIN_ATTEMPT_PREFIX = "auth:login-attempt:";
+    static String REFRESH_TOKEN_PREFIX = "auth:refresh:";
+    static String BLACKLIST_PREFIX = "auth:blacklist:";
+    static String BEARER_PREFIX = "Bearer ";
+
     UserRepo userRepo;
 
     PasswordEncoder passwordEncoder;
