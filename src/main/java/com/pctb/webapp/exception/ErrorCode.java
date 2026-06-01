@@ -13,6 +13,13 @@ public enum ErrorCode {
     PASSWORD_INVALID(1005, "Password must be at least 8 characters and contain at least 1 special character", HttpStatus.BAD_REQUEST),
     CONFIRM_PASSWORD_NOT_MATCH(1006, "Confirm password does not match", HttpStatus.BAD_REQUEST),
 
+    EMAIL_NOT_FOUND(1007, "Email not found", HttpStatus.NOT_FOUND),
+    OTP_SEND_LIMIT_EXCEEDED(1008, "OTP send limit exceeded", HttpStatus.TOO_MANY_REQUESTS),
+    OTP_RESEND_TOO_SOON(1009, "Please wait 60 seconds before requesting a new OTP", HttpStatus.TOO_MANY_REQUESTS),
+    OTP_INVALID(1010, "OTP is invalid", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1011, "OTP has expired", HttpStatus.BAD_REQUEST),
+    ACCOUNT_ALREADY_VERIFIED(1012, "Account already verified", HttpStatus.CONFLICT),
+
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 
     VALUE_REQUIRED(1102, "Value is required", HttpStatus.BAD_REQUEST),
