@@ -19,6 +19,11 @@ public enum ErrorCode {
     OTP_INVALID(1010, "OTP is invalid", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(1011, "OTP has expired", HttpStatus.BAD_REQUEST),
     ACCOUNT_ALREADY_VERIFIED(1012, "Account already verified", HttpStatus.CONFLICT),
+    USERNAME_NOT_EXISTED(1013, "Username is not existed", HttpStatus.BAD_REQUEST),
+    PASSWORD_NOT_EXISTED(1014, "Password is not existed", HttpStatus.BAD_REQUEST),
+    ACCOUNT_NOT_VERIFIED(1015, "Account is not verified", HttpStatus.FORBIDDEN),
+    USERNAME_OR_PASSWORD_INCORRECT(1016, "Username or password is incorrect", HttpStatus.UNAUTHORIZED),
+    LOGIN_ATTEMPTS_EXCEEDED(1017, "Login attempts exceeded. Please try again later", HttpStatus.TOO_MANY_REQUESTS),
 
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 

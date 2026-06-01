@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/register",
+                                "/auth/login",
                                 "/redis/set",
                                 "/auth/otp-requests",
                                 "/auth/otp-verification",
