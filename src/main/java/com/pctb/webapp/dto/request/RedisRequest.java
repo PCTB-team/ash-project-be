@@ -1,26 +1,25 @@
 package com.pctb.webapp.dto.request;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RedisRequest {
-    @NotBlank(message = "REDIS_KEY_INVALID")
+    @NotBlank(message = "KEY_REQUIRED")
     String key;
 
-    @NotBlank(message = "REDIS_VALUE_INVALID")
     String value;
 
-    @Positive(message = "REDIS_TTL_INVALID")
+    @Min(value = 1, message = "TTL_INVALID")
     Long ttlSeconds;
 }

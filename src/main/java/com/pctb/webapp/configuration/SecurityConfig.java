@@ -39,8 +39,16 @@ public class SecurityConfig {
                 })
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/logout","/auth/outbound/authentication").permitAll()
-                        .requestMatchers("/user", "/swagger-ui/**", "/v3/api-docs/**","/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/auth/register",
+                                "/auth/login",
+                                "/redis/set",
+                                "/auth/otp-requests",
+                                "/auth/otp-verification",
+                                "/set-with-ttl",
+                                "/increment").permitAll()
+                        .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
+                        .requestMatchers("/user","/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(Customizer.withDefaults())

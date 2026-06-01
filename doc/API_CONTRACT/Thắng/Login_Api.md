@@ -1,13 +1,11 @@
-﻿## Login
+﻿## Login Account
 
 ### Endpoint
- 
+
 ```http
 POST /auth/login
 ```
-
 ---
-
 ## Request
 
 ### Headers
@@ -15,20 +13,17 @@ POST /auth/login
 ```http
 Content-Type: application/json
 ```
-
 ---
 
 ### Request Body
 
 ```json
 {
-  "identifier": "user@example.com",
-  "password": "P@ssw0rd!"
+  "Identifier": "user@example.com",
+  "password": "Password@123"
 }
 ```
-
 ---
-
 ## Success Response
 
 ### HTTP Status
@@ -36,9 +31,7 @@ Content-Type: application/json
 ```http
 200 OK
 ```
-
 ---
-
 ### Response Body
 
 ```json
@@ -47,24 +40,15 @@ Content-Type: application/json
   "message": "Login successfully",
   "result": {
     "accessToken": "<JWT_ACCESS_TOKEN>",
-    "refreshToken": "<REFRESH_TOKEN>",
-    "tokenType": "Bearer",
-    "expiresIn": 3600,
-    "user": {
-      "id": 12,
-      "username": "johndoe",
-      "email": "user@example.com",
-      "fullname": "John Doe"
-    }
+    "refreshToken": "<JWT_REFRESH_TOKEN>",
+    "authenticated": true
   }
 }
 ```
-
 ---
-
 ## Error Responses
 
-### Identifier Is Required
+### Username Invalid
 
 ```http
 400 Bad Request
@@ -72,14 +56,14 @@ Content-Type: application/json
 
 ```json
 {
-  "code": 1017,
-  "message": "Identifier is required"
+  "code": 1013,
+  "message": "Username is not existed"
 }
 ```
 
 ---
 
-### Password Is Required
+### Password Invalid
 
 ```http
 400 Bad Request
@@ -87,23 +71,8 @@ Content-Type: application/json
 
 ```json
 {
-  "code": 1018,
-  "message": "Password is required"
-}
-```
-
----
-
-### Invalid Credentials
-
-```http
-401 Unauthorized
-```
-
-```json
-{
-  "code": 1019,
-  "message": "Invalid email/username or password"
+  "code": 1014,
+  "message": "Password is not existed"
 }
 ```
 
@@ -117,8 +86,23 @@ Content-Type: application/json
 
 ```json
 {
-  "code": 1020,
+  "code": 1015,
   "message": "Account is not verified"
+}
+```
+
+---
+
+### Username Or Password Incorrect
+
+```http
+401 Unauthorized
+```
+
+```json
+{
+  "code": 1016,
+  "message": "Username or password is incorrect"
 }
 ```
 
@@ -132,7 +116,7 @@ Content-Type: application/json
 
 ```json
 {
-  "code": 1021,
-  "message": "Too many login attempts. Please try again later"
+  "code": 1017,
+  "message": "Login attempts exceeded. Please try again later"
 }
 ```

@@ -1,7 +1,5 @@
 package com.pctb.webapp.service;
 
-import com.pctb.webapp.exception.AppException;
-import com.pctb.webapp.exception.ErrorCode;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -14,28 +12,37 @@ import java.time.Duration;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RedisService {
-    StringRedisTemplate redisTemplate;
-
-    public void setValue(String key, String value, Long ttlSeconds) {
-        if (ttlSeconds != null) {
-            redisTemplate.opsForValue().set(key, value, Duration.ofSeconds(ttlSeconds));
-            return;
-        }
-        redisTemplate.opsForValue().set(key, value);
+    StringRedisTemplate stringRedisTemplate;
+// lưu key và value không giới hạn
+    public void set(String key, String value) {
+        stringRedisTemplate.opsForValue().set(key, value);
     }
-
-    public String getValue(String key) {
-        String value = redisTemplate.opsForValue().get(key);
-        if (value == null) {
-            throw new AppException(ErrorCode.REDIS_KEY_NOT_FOUND);
-        }
-        return value;
+// lưu key và vlue có giới hạn Ttl
+    public void setWithTtl(String key, String value, long ttlSeconds) {
+        stringRedisTemplate.opsForValue().set(key, value, Duration.ofSeconds(ttlSeconds));
     }
-
-    public void deleteValue(String key) {
-        Boolean deleted = redisTemplate.delete(key);
-        if (!Boolean.TRUE.equals(deleted)) {
-            throw new AppException(ErrorCode.REDIS_KEY_NOT_FOUND);
-        }
+// đọc value theo key
+    public String get(String key) {
+        return stringRedisTemplate.opsForValue().get(key);
+    }
+// kiểm tra key có tồn tại không
+    public boolean hasKey(String key) {
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+    }
+// xóa key
+    public void delete(String key) {
+        stringRedisTemplate.delete(key);
+    }
+// tăng giá trị của key
+    public Long increment(String key) {
+        return stringRedisTemplate.opsForValue().increment(key);
+    }
+// gán thời gian hết hạn cho 1 key
+    public boolean expire(String key, long ttlSeconds) {
+        return Boolean.TRUE.equals(stringRedisTemplate.expire(key, Duration.ofSeconds(ttlSeconds)));
+    }
+// lấy thời gian sống còn lại của keyt
+    public Long getTtl(String key) {
+        return stringRedisTemplate.getExpire(key);
     }
 }

@@ -1,6 +1,11 @@
 package com.pctb.webapp.dto.response;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
 @Getter
@@ -12,7 +17,5 @@ import lombok.experimental.FieldDefaults;
 public class LoginResponse {
     String accessToken;
     String refreshToken;
-    String tokenType;
-    long expiresIn;
-    LoginUserResponse user;
+    Boolean authenticated;
 }

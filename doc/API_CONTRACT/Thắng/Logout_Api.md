@@ -1,34 +1,29 @@
-﻿## Logout
+﻿## Logout Account
 
 ### Endpoint
- 
+
 ```http
 POST /auth/logout
 ```
-
 ---
-
 ## Request
 
 ### Headers
 
 ```http
 Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
+Authorization: Bearer <JWT_ACCESS_TOKEN>
 ```
-
 ---
 
 ### Request Body
 
 ```json
 {
-  "refreshToken": "<REFRESH_TOKEN>"
+  "refreshToken": "<JWT_REFRESH_TOKEN>"
 }
 ```
-
 ---
-
 ## Success Response
 
 ### HTTP Status
@@ -36,9 +31,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 ```http
 200 OK
 ```
-
 ---
-
 ### Response Body
 
 ```json
@@ -50,36 +43,19 @@ Authorization: Bearer <ACCESS_TOKEN>
   }
 }
 ```
-
 ---
-
 ## Error Responses
 
-### Unauthorized
+### Refresh Token Missing
 
 ```http
-401 Unauthorized
+400 Bad Request
 ```
 
 ```json
 {
-  "code": 1022,
-  "message": "Unauthorized"
-}
-```
-
----
-
-### Access Token Invalid
-
-```http
-401 Unauthorized
-```
-
-```json
-{
-  "code": 1023,
-  "message": "Access token is invalid"
+  "code": 1018,
+  "message": "Refresh token is required"
 }
 ```
 
@@ -88,19 +64,34 @@ Authorization: Bearer <ACCESS_TOKEN>
 ### Refresh Token Invalid
 
 ```http
-400 Bad Request
+401 Unauthorized
 ```
 
 ```json
 {
-  "code": 1024,
+  "code": 1019,
   "message": "Refresh token is invalid"
 }
 ```
 
 ---
 
-### Token Already Logged Out
+### Token Expired
+
+```http
+401 Unauthorized
+```
+
+```json
+{
+  "code": 1020,
+  "message": "Token has expired"
+}
+```
+
+---
+
+### Account Already Logged Out
 
 ```http
 409 Conflict
@@ -108,7 +99,22 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ```json
 {
-  "code": 1025,
-  "message": "Token already logged out"
+  "code": 1021,
+  "message": "Account already logged out"
+}
+```
+
+---
+
+### Unauthenticated
+
+```http
+401 Unauthorized
+```
+
+```json
+{
+  "code": 1022,
+  "message": "Unauthenticated"
 }
 ```
