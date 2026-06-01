@@ -8,6 +8,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+
+// Class dùng để lưu tạm thông tin user vào redis để chờ xác thực
 public class PendingRegisterRequest {
     String username;
     String email;
