@@ -138,3 +138,18 @@ Content-Type: application/json
   "message": "Confirm password does not match"
 }
 ```
+
+---
+
+### OTP Send Limit Exceeded
+
+```http
+429 Too Many Requests
+```
+
+```json
+{
+  "code": 1008,
+  "message": "OTP send limit exceeded"
+}
+```

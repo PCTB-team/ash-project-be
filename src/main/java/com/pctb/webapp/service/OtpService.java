@@ -62,29 +62,24 @@ public class OtpService {
 
     // ResendOtp
     public OtpResponse resendOtp(String email) {
-        if (!redisService.hasKey(registerKey(email))) {
-            throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
+        if (userRepo.existsByEmail(email)) {
+            throw new AppException(ErrorCode.ACCOUNT_ALREADY_VERIFIED);
         }
 
-        if (redisService.hasKey(cooldownKey(email))) {
+        String pendingJson = redisService.get(registerKey(email));
+        if (pendingJson == null) {
+            throw new AppException(ErrorCode.REGISTER_SESSION_EXPIRED);
+        }
+
+        String cooldown = redisService.get(cooldownKey(email));
+        if (cooldown != null) {
             throw new AppException(ErrorCode.OTP_RESEND_TOO_SOON);
         }
 
-        checkLimit(email);
-
-        String otp = generateOtp();
-
-        redisService.setWithTtl(otpKey(email), otp, otpTtlSeconds);
-        redisService.setWithTtl(cooldownKey(email), "1", resendCooldownSeconds);
-        increaseLimit(email);
-
-        mailService.sendOtp(email, otp);
-
-        System.out.println("OTP for " + email + ": " + otp);
+        sendOtpAfterRegister(email);
 
         return OtpResponse.builder()
                 .email(email)
-                .verified(false)
                 .build();
     }
     // Xác thực otp
@@ -105,6 +100,7 @@ public class OtpService {
         if (pendingJson == null) {
             throw new AppException(ErrorCode.OTP_EXPIRED);
         }
+
         PendingRegisterRequest pending;
         // Chuyển JSON thanhf object
         try {

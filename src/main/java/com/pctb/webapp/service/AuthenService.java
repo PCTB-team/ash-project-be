@@ -75,6 +75,10 @@ public class AuthenService {
     @NonFinal
     long loginAttemptWindowSeconds;
 
+    @Value("${app.register.pending-ttl-seconds:300}")
+    @NonFinal
+    long pendingRegisterTtlSeconds;
+
 // Hàm đăng kí
     public RegisterResponse register(RegisterRequest request) {
         // Kiểm tra xem email đã tồn tại chưa
@@ -108,7 +112,7 @@ public class AuthenService {
         }
         // Lưu dưới redis
         redisService.setWithTtl(pendingRegisterKey(request.getEmail()),pendingJson ,
-                resendCooldownSeconds);
+                pendingRegisterTtlSeconds);
 
         otpService.sendOtpAfterRegister(request.getEmail());
 
