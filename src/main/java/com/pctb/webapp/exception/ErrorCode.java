@@ -25,6 +25,8 @@ public enum ErrorCode {
     USERNAME_OR_PASSWORD_INCORRECT(1016, "Username or password is incorrect", HttpStatus.UNAUTHORIZED),
     LOGIN_ATTEMPTS_EXCEEDED(1017, "Login attempts exceeded. Please try again later", HttpStatus.TOO_MANY_REQUESTS),
 
+
+
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 
     VALUE_REQUIRED(1102, "Value is required", HttpStatus.BAD_REQUEST),

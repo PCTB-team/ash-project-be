@@ -33,7 +33,7 @@ public class SecurityConfig {
     private String jwtSecret;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity httpSecurity, TokenBlacklistFilter tokenBlacklistFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .cors(cors -> {
                 })
@@ -56,8 +56,8 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer
                         .decoder(jwtDecoder())
                         .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                ))
-                .addFilterBefore(tokenBlacklistFilter, BearerTokenAuthenticationFilter.class);
+                ));
+
 
         return httpSecurity.build();
     }
