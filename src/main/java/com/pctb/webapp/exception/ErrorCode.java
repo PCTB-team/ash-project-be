@@ -25,7 +25,14 @@ public enum ErrorCode {
     USERNAME_OR_PASSWORD_INCORRECT(1016, "Username or password is incorrect", HttpStatus.UNAUTHORIZED),
     LOGIN_ATTEMPTS_EXCEEDED(1017, "Login attempts exceeded. Please try again later", HttpStatus.TOO_MANY_REQUESTS),
 
+    EMAIL_NOT_EXISTED(1020, "Email does not exist in the system", HttpStatus.NOT_FOUND),
+    FORGOT_PASSWORD_OTP_INVALID(1021, "Invalid OTP verification code", HttpStatus.BAD_REQUEST),
+    FORGOT_PASSWORD_OTP_EXPIRED(1022, "OTP code has expired or does not exist", HttpStatus.BAD_REQUEST),
+    RESET_TOKEN_INVALID(1023, "Session has expired or password reset token is invalid", HttpStatus.UNAUTHORIZED),
 
+    // Thêm các mã lỗi này vào dưới RESET_TOKEN_INVALID(1023, ...)
+    RESET_PASSWORD_MISMATCH(1024, "Confirm password does not match new password", HttpStatus.BAD_REQUEST),
+    RESET_PASSWORD_FAILED(1025, "Failed to update new password", HttpStatus.INTERNAL_SERVER_ERROR),
 
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 
