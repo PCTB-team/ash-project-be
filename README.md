@@ -1,5 +1,15 @@
 # AI Study Hub - Backend
 
+## Screenshots
+
+### Frontend
+![AI Study Hub Frontend](docs/images/FE.png)
+
+### Backend API
+![AI Study Hub Backend Swagger](docs/images/BE.png)
+
+---
+
 ## Overview
 AI Study Hub Backend is a RESTful API system for managing learning documents, cloud storage integration, and AI-powered chatbot support.
 
