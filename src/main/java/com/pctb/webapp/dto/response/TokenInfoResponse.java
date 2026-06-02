@@ -6,8 +6,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -15,6 +16,17 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class LogoutResponse {
-    Boolean loggedOut;
+public class TokenInfoResponse {
+    Boolean valid;
+    String userId;
+    String username;
+    String email;
+    String fullname;
+    Boolean verified;
+    List<String> roles;
+    String tokenType;
+    String issuer;
+    String jwtId;
+    String issuedAt;
+    String expiresAt;
 }

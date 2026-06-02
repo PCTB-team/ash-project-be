@@ -1,16 +1,19 @@
 package com.pctb.webapp.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+@AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LogoutRequest {
-
-    @NotBlank(message = "REFRESH_TOKEN_INVALID")
+    @NotBlank(message = "REFRESH_TOKEN_REQUIRED")
     String refreshToken;
 }

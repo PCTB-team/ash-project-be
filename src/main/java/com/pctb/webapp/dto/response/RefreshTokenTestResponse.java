@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Getter
@@ -15,6 +14,7 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class LogoutResponse {
-    Boolean loggedOut;
+public class RefreshTokenTestResponse {
+    String accessToken;
+    String refreshToken;
 }
