@@ -29,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -41,16 +42,32 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.pctb.webapp.dto.request.ForgotPasswordRequest;
+import com.pctb.webapp.dto.request.ResetPasswordRequest;
+import com.pctb.webapp.dto.request.VerifyOtpRequest;
+
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenService {
+    static String LOGIN_ATTEMPT_PREFIX = "auth:login-attempt:";
+    static String REFRESH_TOKEN_PREFIX = "auth:refresh:";
+    static String BLACKLIST_PREFIX = "auth:blacklist:";
+    static String BEARER_PREFIX = "Bearer ";
+    static String OTP_FORGOT_PREFIX = "OTP_FORGOT:";
+    static String RESET_TOKEN_PREFIX = "RESET_TOKEN:";
+
     UserRepo userRepo;
 
     PasswordEncoder passwordEncoder;
     OtpService otpService;
     RedisService redisService;
     ObjectMapper objectMapper;
+    StringRedisTemplate redisTemplate;
+    MailService mailService;
     @Value("${jwt.signerKey}")
     @NonFinal
     String jwtSignerKey;
@@ -74,6 +91,10 @@ public class AuthenService {
     @Value("${app.auth.login-attempt-window-seconds:300}")
     @NonFinal
     long loginAttemptWindowSeconds;
+
+    @Value("${app.register.pending-ttl-seconds:300}")
+    @NonFinal
+    long pendingRegisterTtlSeconds;
 
 // Hàm đăng kí
     public RegisterResponse register(RegisterRequest request) {
@@ -108,7 +129,7 @@ public class AuthenService {
         }
         // Lưu dưới redis
         redisService.setWithTtl(pendingRegisterKey(request.getEmail()),pendingJson ,
-                resendCooldownSeconds);
+                pendingRegisterTtlSeconds);
 
         otpService.sendOtpAfterRegister(request.getEmail());
 
@@ -409,4 +430,92 @@ public class AuthenService {
         return "register:pending:" + email;
     }
 
+    public void sendOtpForgotPassword(ForgotPasswordRequest request) {
+
+        User user = userRepo.findByEmail(request.getEmail())
+                .orElseThrow(() ->
+                        new AppException(ErrorCode.EMAIL_NOT_EXISTED));
+
+        String otp = String.format("%06d",
+                new Random().nextInt(999999));
+
+        redisTemplate.opsForValue().set(
+                OTP_FORGOT_PREFIX + user.getEmail(),
+                otp,
+                5,
+                TimeUnit.MINUTES
+        );
+
+        mailService.sendOtp(user.getEmail(), otp);
+    }
+
+    public String verifyOtpForgotPassword(
+            VerifyOtpRequest request) {
+
+        String savedOtp = redisTemplate.opsForValue()
+                .get(OTP_FORGOT_PREFIX + request.getEmail());
+
+        if (savedOtp == null) {
+            throw new AppException(
+                    ErrorCode.FORGOT_PASSWORD_OTP_EXPIRED);
+        }
+
+        if (!savedOtp.equals(request.getOtp())) {
+            throw new AppException(
+                    ErrorCode.FORGOT_PASSWORD_OTP_INVALID);
+        }
+
+        redisTemplate.delete(
+                OTP_FORGOT_PREFIX + request.getEmail());
+
+        String resetToken = UUID.randomUUID().toString();
+
+        redisTemplate.opsForValue().set(
+                RESET_TOKEN_PREFIX + resetToken,
+                request.getEmail(),
+                5,
+                TimeUnit.MINUTES
+        );
+
+        return resetToken;
+    }
+
+    public void resetPassword(
+            ResetPasswordRequest request) {
+
+        if (!request.getNewPassword()
+                .equals(request.getConfirmPassword())) {
+
+            throw new AppException(
+                    ErrorCode.RESET_PASSWORD_MISMATCH);
+        }
+
+        String email = redisTemplate.opsForValue()
+                .get(RESET_TOKEN_PREFIX
+                        + request.getResetToken());
+
+        if (email == null) {
+            throw new AppException(
+                    ErrorCode.RESET_TOKEN_INVALID);
+        }
+
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() ->
+                        new AppException(
+                                ErrorCode.EMAIL_NOT_EXISTED));
+
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getNewPassword()));
+
+        userRepo.save(user);
+
+        redisTemplate.delete(
+                RESET_TOKEN_PREFIX
+                        + request.getResetToken());
+    }
+
+    public void resendForgotPasswordOtp(ForgotPasswordRequest request) {
+        sendOtpForgotPassword(request);
+    }
 }

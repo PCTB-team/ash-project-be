@@ -62,34 +62,36 @@ public class OtpService {
 
     // ResendOtp
     public OtpResponse resendOtp(String email) {
-        if (!redisService.hasKey(registerKey(email))) {
-            throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
+        if (userRepo.existsByEmail(email)) {
+            throw new AppException(ErrorCode.ACCOUNT_ALREADY_VERIFIED);
         }
 
-        if (redisService.hasKey(cooldownKey(email))) {
+        String pendingJson = redisService.get(registerKey(email));
+        if (pendingJson == null) {
+            throw new AppException(ErrorCode.REGISTER_SESSION_EXPIRED);
+        }
+
+        String cooldown = redisService.get(cooldownKey(email));
+        if (cooldown != null) {
             throw new AppException(ErrorCode.OTP_RESEND_TOO_SOON);
         }
 
-        checkLimit(email);
-
-        String otp = generateOtp();
-
-        redisService.setWithTtl(otpKey(email), otp, otpTtlSeconds);
-        redisService.setWithTtl(cooldownKey(email), "1", resendCooldownSeconds);
-        increaseLimit(email);
-
-        mailService.sendOtp(email, otp);
-
-        System.out.println("OTP for " + email + ": " + otp);
+        sendOtpAfterRegister(email);
 
         return OtpResponse.builder()
                 .email(email)
-                .verified(false)
                 .build();
     }
     // Xác thực otp
     public OtpResponse verifyOtp(String email, String otp) {
 
+
+
+        // Lấy value JSON từ redis
+        String pendingJson = redisService.get(registerKey(email));
+        if (pendingJson == null) {
+            throw new AppException(ErrorCode.REGISTER_SESSION_EXPIRED);
+        }
         // lấy otp đã save từ redis
         String savedOtp = redisService.get(otpKey(email));
         // Nếu không có trong redis thì tức là đã hết hạn
@@ -100,11 +102,8 @@ public class OtpService {
         if (!savedOtp.equals(otp)) {
             throw new AppException(ErrorCode.OTP_INVALID);
         }
-        // Lấy value JSON từ redis
-        String pendingJson = redisService.get(registerKey(email));
-        if (pendingJson == null) {
-            throw new AppException(ErrorCode.OTP_EXPIRED);
-        }
+
+
         PendingRegisterRequest pending;
         // Chuyển JSON thanhf object
         try {
@@ -114,7 +113,7 @@ public class OtpService {
         }
         // Phải ktra lại vì nếu trong khoản tgian đợi verify otp thì có người khác đã đăng kí thành công cùng 1 giá trij rồi
         if (userRepo.existsByEmail(pending.getEmail())) {
-            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            throw new AppException(ErrorCode.ACCOUNT_ALREADY_VERIFIED);
         }
 
         if (userRepo.existsByUsername(pending.getUsername())) {
