@@ -6,14 +6,11 @@ import com.pctb.webapp.dto.response.LoginResponse;
 import com.pctb.webapp.dto.response.OtpResponse;
 import com.pctb.webapp.dto.response.RegisterResponse;
 import com.pctb.webapp.service.AuthenService;
-import com.pctb.webapp.service.ForgotPasswordService;
 import com.pctb.webapp.service.OtpService;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -25,7 +22,6 @@ import java.util.Map;
 public class AuthenController {
     AuthenService authenService;
     OtpService otpService;
-    ForgotPasswordService forgotPasswordService;
 
     @PostMapping("/register")
     public ApiResponse<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
@@ -59,9 +55,11 @@ public class AuthenController {
                 .build();
     }
     @PostMapping("/forgot-password/send-otp")
-    @Operation(summary = "Step 1: Validate target Email and request OTP code dispatch")
-    public ApiResponse<Map<String, String>> sendOtpForgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        forgotPasswordService.sendOtpForgotPassword(request);
+    public ApiResponse<Map<String, String>> sendOtpForgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        authenService.sendOtpForgotPassword(request);
+
         return ApiResponse.<Map<String, String>>builder()
                 .message("Verification OTP has been successfully dispatched to your email address.")
                 .result(Map.of("email", request.getEmail()))
@@ -69,23 +67,39 @@ public class AuthenController {
     }
 
     @PostMapping("/forgot-password/verify-otp")
-    @Operation(summary = "Step 2: Verify submitted OTP values and acquire unique Reset Token transaction key")
-    public ApiResponse<Map<String, String>> verifyOtpForgotPassword(@Valid @RequestBody VerifyOtpRequest request) {
-        // Gọi hàm verifyOtpForgotPassword chuyên biệt của ForgotPasswordService để lấy resetToken
-        String resetToken = forgotPasswordService.verifyOtpForgotPassword(request);
+    public ApiResponse<Map<String, String>> verifyOtpForgotPassword(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        String resetToken =
+                authenService.verifyOtpForgotPassword(request);
+
         return ApiResponse.<Map<String, String>>builder()
-                .message("OTP verification successful. Use the provided reset token to update your password.")
+                .message("OTP verification successful.")
                 .result(Map.of("resetToken", resetToken))
                 .build();
     }
 
     @PostMapping("/forgot-password/reset")
-    @Operation(summary = "Step 3: Modify user password record using validated Reset Token credential passport")
-    public ApiResponse<Object> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        forgotPasswordService.resetPassword(request);
+    public ApiResponse<Object> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authenService.resetPassword(request);
+
         return ApiResponse.builder()
-                .message("Password reset operation completed successfully. You may now perform authentication with your new password.")
+                .message("Password reset successfully.")
                 .result(null)
+                .build();
+    }
+
+    @PostMapping("/forgot-password/resend-otp")
+    public ApiResponse<Map<String, String>> resendForgotPasswordOtp(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        authenService.resendForgotPasswordOtp(request);
+
+        return ApiResponse.<Map<String, String>>builder()
+                .message("OTP resent successfully")
+                .result(Map.of("email", request.getEmail()))
                 .build();
     }
 }
