@@ -47,17 +47,24 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/register",
                                 "/auth/login",
+                                "/auth/refresh-token",
+                                "/auth/test-new-access-token",
+                                "/auth/test-token",
                                 "/redis/set",
                                 "/auth/otp-requests",
                                 "/auth/otp-verification",
                                 "/set-with-ttl",
                                 "/increment").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
                         .requestMatchers("/user","/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS) )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer.decoder(jwtDecoder()) ))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer
+                        .decoder(jwtDecoder())
+                        .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                ))
 
                 ;
 

@@ -24,6 +24,11 @@ public enum ErrorCode {
     ACCOUNT_NOT_VERIFIED(1015, "Account is not verified", HttpStatus.FORBIDDEN),
     USERNAME_OR_PASSWORD_INCORRECT(1016, "Username or password is incorrect", HttpStatus.UNAUTHORIZED),
     LOGIN_ATTEMPTS_EXCEEDED(1017, "Login attempts exceeded. Please try again later", HttpStatus.TOO_MANY_REQUESTS),
+    REFRESH_TOKEN_REQUIRED(1018, "Refresh token is required", HttpStatus.BAD_REQUEST),
+    REFRESH_TOKEN_INVALID(1019, "Refresh token is invalid", HttpStatus.UNAUTHORIZED),
+    TOKEN_EXPIRED(1020, "Token has expired", HttpStatus.UNAUTHORIZED),
+    ACCOUNT_ALREADY_LOGGED_OUT(1021, "Account already logged out", HttpStatus.CONFLICT),
+    UNAUTHENTICATED(1022, "Unauthenticated", HttpStatus.UNAUTHORIZED),
 
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 
