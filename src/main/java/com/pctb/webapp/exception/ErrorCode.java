@@ -30,14 +30,14 @@ public enum ErrorCode {
     ACCOUNT_ALREADY_LOGGED_OUT(1021, "Account already logged out", HttpStatus.CONFLICT),
     UNAUTHENTICATED(1022, "Unauthenticated", HttpStatus.UNAUTHORIZED),
 
-    EMAIL_NOT_EXISTED(1020, "Email does not exist in the system", HttpStatus.NOT_FOUND),
-    FORGOT_PASSWORD_OTP_INVALID(1021, "Invalid OTP verification code", HttpStatus.BAD_REQUEST),
-    FORGOT_PASSWORD_OTP_EXPIRED(1022, "OTP code has expired or does not exist", HttpStatus.BAD_REQUEST),
-    RESET_TOKEN_INVALID(1023, "Session has expired or password reset token is invalid", HttpStatus.UNAUTHORIZED),
+    EMAIL_NOT_EXISTED(1023, "Email does not exist in the system", HttpStatus.NOT_FOUND),
+    FORGOT_PASSWORD_OTP_INVALID(1024, "Invalid OTP verification code", HttpStatus.BAD_REQUEST),
+    FORGOT_PASSWORD_OTP_EXPIRED(1025, "OTP code has expired or does not exist", HttpStatus.BAD_REQUEST),
+    RESET_TOKEN_INVALID(1026, "Session has expired or password reset token is invalid", HttpStatus.UNAUTHORIZED),
 
     // Thêm các mã lỗi này vào dưới RESET_TOKEN_INVALID(1023, ...)
-    RESET_PASSWORD_MISMATCH(1024, "Confirm password does not match new password", HttpStatus.BAD_REQUEST),
-    RESET_PASSWORD_FAILED(1025, "Failed to update new password", HttpStatus.INTERNAL_SERVER_ERROR),
+    RESET_PASSWORD_MISMATCH(1027, "Confirm password does not match new password", HttpStatus.BAD_REQUEST),
+    RESET_PASSWORD_FAILED(1028, "Failed to update new password", HttpStatus.INTERNAL_SERVER_ERROR),
 
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 
