@@ -157,4 +157,12 @@ public class AuthenController {
                 .result(Map.of("email", request.getEmail()))
                 .build();
     }
+
+    @PostMapping("/google-login")
+    public ApiResponse<LoginResponse> googleLogin(@RequestBody @Valid GoogleLoginRequest request) {
+        return ApiResponse.<LoginResponse>builder()
+                .message("Google login successfully")
+                .result(authenService.googleLogin(request))
+                .build();
+    }
 }

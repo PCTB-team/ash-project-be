@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 @SuppressWarnings("unused") // Thêm dòng này để tắt cảnh báo "never used" của IntelliJ
 public class GoogleLoginRequest {
-    @NotBlank(message = "Google ID Token is required")
+    @NotBlank(message = "GOOGLE_TOKEN_REQUIRED")
     private String token;
 }
