@@ -436,9 +436,7 @@ public class AuthenService {
                 .orElseThrow(() ->
                         new AppException(ErrorCode.EMAIL_NOT_EXISTED));
 
-        String otp = String.format("%06d",
-                new Random().nextInt(999999));
-
+        String otp = otpService.generateOtp();
         redisTemplate.opsForValue().set(
                 OTP_FORGOT_PREFIX + user.getEmail(),
                 otp,

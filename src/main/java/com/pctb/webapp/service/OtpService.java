@@ -171,7 +171,7 @@ public class OtpService {
         return "register:pending:" + email;
     }
     // Tạo otp
-    private String generateOtp() {
+    public String generateOtp() {
         int otp = secureRandom.nextInt(900000) + 100000;
         return String.valueOf(otp);
     }
