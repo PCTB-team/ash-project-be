@@ -387,6 +387,7 @@ public class AuthenService {
                     .claim("scope", scope)
                     .claim("tokenType", tokenType)
                     .claim("username", user.getUsername())
+                    .claim("fullname", user.getFullname())
                     .claim("email", user.getEmail())
                     .build();
 
