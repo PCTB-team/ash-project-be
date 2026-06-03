@@ -2,6 +2,10 @@ package com.pctb.webapp.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -9,20 +13,18 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.pctb.webapp.dto.request.LoginRequest;
-import com.pctb.webapp.dto.request.LogoutRequest;
-import com.pctb.webapp.dto.request.PendingRegisterRequest;
-import com.pctb.webapp.dto.request.RefreshTokenRequest;
-import com.pctb.webapp.dto.request.RegisterRequest;
+import com.pctb.webapp.dto.request.*;
 import com.pctb.webapp.dto.response.LoginResponse;
 import com.pctb.webapp.dto.response.LogoutResponse;
 import com.pctb.webapp.dto.response.RefreshTokenTestResponse;
 import com.pctb.webapp.dto.response.RegisterResponse;
 import com.pctb.webapp.dto.response.TokenInfoResponse;
 import com.pctb.webapp.entity.Role;
+import com.pctb.webapp.entity.RoleEnum;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.repository.RoleRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -36,17 +38,9 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import com.pctb.webapp.dto.request.ForgotPasswordRequest;
-import com.pctb.webapp.dto.request.ResetPasswordRequest;
-import com.pctb.webapp.dto.request.VerifyOtpRequest;
-
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -62,12 +56,18 @@ public class AuthenService {
 
     UserRepo userRepo;
 
+    RoleRepo roleRepo;
     PasswordEncoder passwordEncoder;
     OtpService otpService;
     RedisService redisService;
     ObjectMapper objectMapper;
     StringRedisTemplate redisTemplate;
     MailService mailService;
+
+    @Value("${google.client-id}")
+    @NonFinal
+    String googleClientId;
+
     @Value("${jwt.signerKey}")
     @NonFinal
     String jwtSignerKey;
@@ -515,5 +515,93 @@ public class AuthenService {
 
     public void resendForgotPasswordOtp(ForgotPasswordRequest request) {
         sendOtpForgotPassword(request);
+    }
+
+    private GoogleIdToken.Payload verifyGoogleToken(String token) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    GoogleNetHttpTransport.newTrustedTransport(),
+                    GsonFactory.getDefaultInstance()
+            )
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(token);
+
+            if (idToken == null) {
+                throw new AppException(ErrorCode.GOOGLE_TOKEN_INVALID);
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+
+            if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+                throw new AppException(ErrorCode.GOOGLE_TOKEN_INVALID);
+            }
+
+            return payload;
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.GOOGLE_TOKEN_INVALID);
+        }
+    }
+
+    private String generateGoogleUsername(String email) {
+        String baseUsername = email.substring(0, email.indexOf("@"))
+                .replaceAll("[^a-zA-Z0-9]", "");
+
+        if (baseUsername.length() < 3) {
+            baseUsername = "user";
+        }
+
+        String username = baseUsername;
+        int counter = 1;
+
+        while (userRepo.existsByUsername(username)) {
+            username = baseUsername + counter;
+            counter++;
+        }
+
+        return username;
+    }
+
+    private User createGoogleUser(String email, String fullname) {
+        Role userRole = roleRepo.findById(RoleEnum.USER.name())
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+        User user = User.builder()
+                .email(email)
+                .username(generateGoogleUsername(email))
+                .fullname(fullname != null && !fullname.isBlank() ? fullname : email)
+                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .verified(true)
+                .roles(Set.of(userRole))
+                .build();
+
+        return userRepo.save(user);
+    }
+
+    public LoginResponse googleLogin(GoogleLoginRequest request) {
+        GoogleIdToken.Payload payload = verifyGoogleToken(request.getToken());
+
+        String email = payload.getEmail();
+        String fullname = (String) payload.get("name");
+
+        User user = userRepo.findByEmail(email)
+                .orElseGet(() -> createGoogleUser(email, fullname));
+
+        if (!user.isVerified()) {
+            user.setVerified(true);
+            userRepo.save(user);
+        }
+
+        String accessToken = generateToken(user, accessTokenValidSeconds, "access");
+        String refreshToken = generateToken(user, refreshTokenValidSeconds, "refresh");
+
+        redisService.setWithTtl(refreshTokenKey(user.getId()), refreshToken, refreshTokenValidSeconds);
+
+        return LoginResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .authenticated(true)
+                .build();
     }
 }

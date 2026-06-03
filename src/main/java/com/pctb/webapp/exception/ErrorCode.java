@@ -38,6 +38,9 @@ public enum ErrorCode {
     // Thêm các mã lỗi này vào dưới RESET_TOKEN_INVALID(1023, ...)
     RESET_PASSWORD_MISMATCH(1027, "Confirm password does not match new password", HttpStatus.BAD_REQUEST),
     RESET_PASSWORD_FAILED(1028, "Failed to update new password", HttpStatus.INTERNAL_SERVER_ERROR),
+    GOOGLE_TOKEN_REQUIRED(1029, "Google token is required", HttpStatus.BAD_REQUEST),
+    GOOGLE_TOKEN_INVALID(1030, "Google token is invalid", HttpStatus.UNAUTHORIZED),
+    ROLE_NOT_FOUND(1031, "Role not found", HttpStatus.INTERNAL_SERVER_ERROR),
 
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
 

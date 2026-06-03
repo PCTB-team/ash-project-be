@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/forgot-password/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
+                                "/auth/google-login",
                                 "/auth/register",
                                 "/auth/login",
                                 "/auth/refresh-token",
