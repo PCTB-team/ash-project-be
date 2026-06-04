@@ -37,7 +37,7 @@ HTTP Status: 400 Bad Request
 #### Email Not Found
 HTTP Status: 404 Not Found
 {
-"code": 1007,
+"code": 1023,
 "message": "Email does not exist in the system"
 }
 
@@ -46,6 +46,13 @@ HTTP Status: 429 Too Many Requests
 {
 "code": 1008,
 "message": "OTP send limit exceeded"
+}
+
+#### OTP Resend Too Soon
+HTTP Status: 429 Too Many Requests
+{
+"code": 1009,
+"message": "Please wait 60 seconds before requesting a new OTP"
 }
 
 ---
@@ -79,14 +86,14 @@ HTTP Status: 200 OK
 #### Invalid OTP Code
 HTTP Status: 400 Bad Request
 {
-"code": 1009,
+"code": 1024,
 "message": "Invalid OTP verification code"
 }
 
 #### Expired OTP Code
 HTTP Status: 400 Bad Request
 {
-"code": 1010,
+"code": 1025,
 "message": "OTP code has expired or does not exist"
 }
 
@@ -111,7 +118,7 @@ Content-Type: application/json
 HTTP Status: 200 OK
 {
 "code": 1000,
-"message": "Password reset operation completed successfully. You may now log in with your new password.",
+"message": "Password reset successfully.",
 "result": null
 }
 
@@ -127,14 +134,14 @@ HTTP Status: 400 Bad Request
 #### Confirm Password Mismatch
 HTTP Status: 400 Bad Request
 {
-"code": 1006,
-"message": "Confirm password does not match"
+"code": 1027,
+"message": "Confirm password does not match new password"
 }
 
 #### Invalid or Expired Reset Token
 HTTP Status: 401 Unauthorized
 {
-"code": 1011,
+"code": 1026,
 "message": "Session has expired or password reset token is invalid"
 }
 
@@ -150,9 +157,11 @@ HTTP Status: 401 Unauthorized
 | 1003 | 409 Conflict | Username already exists | Register |
 | 1004 | 400 Bad Request | Username must be between 3 and 20 characters and contain no special characters | Register |
 | 1005 | 400 Bad Request | Password must be at least 8 characters and contain at least 1 special character | Register / Forgot Password |
-| 1006 | 400 Bad Request | Confirm password does not match | Register / Forgot Password |
-| 1007 | 404 Not Found | Email does not exist in the system | Forgot Password |
+| 1006 | 400 Bad Request | Confirm password does not match | Register |
 | 1008 | 429 Too Many Requests | OTP send limit exceeded | Register / Forgot Password |
-| 1009 | 400 Bad Request | Invalid OTP verification code | Forgot Password |
-| 1010 | 400 Bad Request | OTP code has expired or does not exist | Forgot Password |
-| 1011 | 401 Unauthorized | Session has expired or password reset token is invalid | Forgot Password |
+| 1009 | 429 Too Many Requests | Please wait 60 seconds before requesting a new OTP | Register / Forgot Password |
+| 1023 | 404 Not Found | Email does not exist in the system | Forgot Password |
+| 1024 | 400 Bad Request | Invalid OTP verification code | Forgot Password |
+| 1025 | 400 Bad Request | OTP code has expired or does not exist | Forgot Password |
+| 1026 | 401 Unauthorized | Session has expired or password reset token is invalid | Forgot Password |
+| 1027 | 400 Bad Request | Confirm password does not match new password | Forgot Password |

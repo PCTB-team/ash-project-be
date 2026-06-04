@@ -1,6 +1,7 @@
 package com.pctb.webapp.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,13 +9,14 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ResetPasswordRequest {
-    @NotBlank(message = "Reset token cannot be blank")
+    @NotBlank(message = "RESET_TOKEN_INVALID")
     private String resetToken;
 
-    @NotBlank(message = "New password cannot be blank")
-    @Size(min = 8, message = "Password must be at least 8 characters long")
+    @NotBlank(message = "PASSWORD_INVALID")
+    @Size(min = 8, message = "PASSWORD_INVALID")
+    @Pattern(regexp = ".*[^a-zA-Z0-9].*", message = "PASSWORD_INVALID")
     private String newPassword;
 
-    @NotBlank(message = "Confirm password cannot be blank")
+    @NotBlank(message = "RESET_PASSWORD_MISMATCH")
     private String confirmPassword;
 }

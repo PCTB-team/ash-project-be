@@ -111,6 +111,21 @@ Content-Type: application/json
 
 ---
 
+### Fullname Invalid
+
+```http
+400 Bad Request
+```
+
+```json
+{
+  "code": 1032,
+  "message": "Full name is invalid"
+}
+```
+
+---
+
 ### Password Invalid
 
 ```http

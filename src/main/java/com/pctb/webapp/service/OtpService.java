@@ -46,13 +46,12 @@ public class OtpService {
 
     // Gửi otp sau khi đăng kí
     public void sendOtpAfterRegister(String email) {
-        checkLimit(email);//kiểm tra xem email đó đã gửi quá 5 lần hay chưa
+        validateOtpSendAvailable(email);//kiểm tra xem email đó đã gửi quá 5 lần hay đang trong cooldown chưa
 
         String otp = generateOtp();
         // lưu otp xuống redis
         redisService.setWithTtl(otpKey(email), otp, otpTtlSeconds);
-        redisService.setWithTtl(cooldownKey(email), "1", resendCooldownSeconds);
-        increaseLimit(email);
+        markOtpSent(email);
 
         // gửi mail
         mailService.sendOtp(email, otp);
@@ -69,11 +68,6 @@ public class OtpService {
         String pendingJson = redisService.get(registerKey(email));
         if (pendingJson == null) {
             throw new AppException(ErrorCode.REGISTER_SESSION_EXPIRED);
-        }
-
-        String cooldown = redisService.get(cooldownKey(email));
-        if (cooldown != null) {
-            throw new AppException(ErrorCode.OTP_RESEND_TOO_SOON);
         }
 
         sendOtpAfterRegister(email);
@@ -113,7 +107,7 @@ public class OtpService {
         }
         // Phải ktra lại vì nếu trong khoản tgian đợi verify otp thì có người khác đã đăng kí thành công cùng 1 giá trij rồi
         if (userRepo.existsByEmail(pending.getEmail())) {
-            throw new AppException(ErrorCode.ACCOUNT_ALREADY_VERIFIED);
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         if (userRepo.existsByUsername(pending.getUsername())) {
@@ -151,11 +145,27 @@ public class OtpService {
 
 
     // Kiểm tra xem số lần gửi otp của email đó có việc qua 5 lần trên ngày không
+    public void validateOtpSendAvailable(String email) {
+        checkLimit(email);
+        checkCooldown(email);
+    }
+
+    public void markOtpSent(String email) {
+        redisService.setWithTtl(cooldownKey(email), "1", resendCooldownSeconds);
+        increaseLimit(email);
+    }
+
     private void checkLimit(String email) {
         String current = redisService.get(limitKey(email));
 
         if (current != null && Long.parseLong(current) >= maxSendPerDay) {
             throw new AppException(ErrorCode.OTP_SEND_LIMIT_EXCEEDED);
+        }
+    }
+
+    private void checkCooldown(String email) {
+        if (redisService.get(cooldownKey(email)) != null) {
+            throw new AppException(ErrorCode.OTP_RESEND_TOO_SOON);
         }
     }
     // tăng số lần của email mỗi lần gọi

@@ -22,9 +22,13 @@ public class RegisterRequest {
 
     @NotBlank(message = "EMAIL_INVALID")
     @Email(message = "EMAIL_INVALID")
+    @Size(max = 100, message = "EMAIL_INVALID")
     String email;
 
+    @NotBlank(message = "FULLNAME_INVALID")
+    @Size(max = 100, message = "FULLNAME_INVALID")
     String fullname;
+
     @NotBlank(message = "PASSWORD_INVALID")
     @Size(min = 8, message = "PASSWORD_INVALID")
     @Pattern(regexp = ".*[^a-zA-Z0-9].*", message = "PASSWORD_INVALID")

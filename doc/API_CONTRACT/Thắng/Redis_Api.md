@@ -37,7 +37,7 @@ Content-Type: application/json
 ```json
 {
   "code": 1000,
-  "message": "Set redis key successfully",
+  "message": "Set key successfully",
   "result": "otp:user@example.com"
 }
 ```
