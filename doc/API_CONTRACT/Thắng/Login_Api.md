@@ -19,7 +19,7 @@ Content-Type: application/json
 
 ```json
 {
-  "Identifier": "user@example.com",
+  "identifier": "user@example.com",
   "password": "Password@123"
 }
 ```
@@ -48,7 +48,7 @@ Content-Type: application/json
 ---
 ## Error Responses
 
-### Username Invalid
+### Identifier Required
 
 ```http
 400 Bad Request
@@ -57,13 +57,13 @@ Content-Type: application/json
 ```json
 {
   "code": 1013,
-  "message": "Username is not existed"
+  "message": "Email or username is required"
 }
 ```
 
 ---
 
-### Password Invalid
+### Password Required
 
 ```http
 400 Bad Request
@@ -72,7 +72,7 @@ Content-Type: application/json
 ```json
 {
   "code": 1014,
-  "message": "Password is not existed"
+  "message": "Password is required"
 }
 ```
 

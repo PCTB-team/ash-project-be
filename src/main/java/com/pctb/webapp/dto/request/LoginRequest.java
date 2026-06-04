@@ -14,9 +14,9 @@ import lombok.experimental.FieldDefaults;
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LoginRequest {
-    @NotBlank(message = "USERNAME_NOT_EXISTED")
+    @NotBlank(message = "IDENTIFIER_REQUIRED")
     String identifier;
 
-    @NotBlank(message = "PASSWORD_NOT_EXISTED")
+    @NotBlank(message = "PASSWORD_REQUIRED")
     String password;
 }

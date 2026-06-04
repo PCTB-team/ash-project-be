@@ -31,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -41,16 +40,11 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import java.util.concurrent.TimeUnit;
-
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenService {
-    static String LOGIN_ATTEMPT_PREFIX = "auth:login-attempt:";
-    static String REFRESH_TOKEN_PREFIX = "auth:refresh:";
-    static String BLACKLIST_PREFIX = "auth:blacklist:";
-    static String BEARER_PREFIX = "Bearer ";
+
     static String OTP_FORGOT_PREFIX = "OTP_FORGOT:";
     static String RESET_TOKEN_PREFIX = "RESET_TOKEN:";
 
@@ -61,7 +55,6 @@ public class AuthenService {
     OtpService otpService;
     RedisService redisService;
     ObjectMapper objectMapper;
-    StringRedisTemplate redisTemplate;
     MailService mailService;
 
     @Value("${google.client-id}")
@@ -72,23 +65,23 @@ public class AuthenService {
     @NonFinal
     String jwtSignerKey;
 
-    @Value("${app.otp.resend-cooldown-seconds}")
+    @Value("${app.otp.ttl-seconds}")
     @NonFinal
-    long resendCooldownSeconds;
+    long otpTtlSeconds;
 
-    @Value("${app.auth.access-token-valid-seconds:60}")
+    @Value("${jwt.accessTokenDuration:3600}")
     @NonFinal
     long accessTokenValidSeconds;
 
-    @Value("${app.auth.refresh-token-valid-seconds:604800}")
+    @Value("${jwt.refreshTokenDuration:604800}")
     @NonFinal
     long refreshTokenValidSeconds;
 
-    @Value("${app.auth.login-attempt-limit:5}")
+    @Value("${jwt.loginAttemptLimit:5}")
     @NonFinal
     long loginAttemptLimit;
 
-    @Value("${app.auth.login-attempt-window-seconds:300}")
+    @Value("${jwt.loginAttemptWindowSeconds:300}")
     @NonFinal
     long loginAttemptWindowSeconds;
 
@@ -96,7 +89,7 @@ public class AuthenService {
     @NonFinal
     long pendingRegisterTtlSeconds;
 
-// Hàm đăng kí
+// Hàm đăng kí nhận vào request
     public RegisterResponse register(RegisterRequest request) {
         // Kiểm tra xem email đã tồn tại chưa
         if (userRepo.existsByEmail(request.getEmail())) {
@@ -121,7 +114,7 @@ public class AuthenService {
                 .encodedPassword(encodedPassword)
                 .build();
         String pendingJson;
-        // Chuyển qua JSON vì redis chỉ tương tác dạng Stin
+        // Chuyển qua JSON vì redis chỉ tương tác dạng Sting
         try {
              pendingJson = objectMapper.writeValueAsString(pending);
         } catch (JsonProcessingException e) {
@@ -140,29 +133,35 @@ public class AuthenService {
                 .build();
     }
 
+    // Hàm dùng để đăng kí login
     public LoginResponse login(LoginRequest request) {
+        // lấy username hoặc email của request bỏ khoẳng trắng
         String identifier = request.getIdentifier().trim();
 
+        // Hàm kiêm tra username or email có tồn tại dưới DB chưa
         User user = userRepo.findByEmailOrUsername(identifier, identifier)
                 .orElseThrow(() -> {
-                    recordFailedLoginAttempt(identifier);
-                    return new AppException(ErrorCode.USERNAME_NOT_EXISTED);
+                    recordFailedLoginAttempt(identifier); // đánh giấu số lần login failed
+                    return new AppException(ErrorCode.USERNAME_OR_PASSWORD_INCORRECT);
                 });
 
+        // Kiểm tra coi user đã được verify otp chưa đúng không
         if (!user.isVerified()) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
         }
-
+        // Đoạn kiểm tra mật khẩu
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             recordFailedLoginAttempt(identifier);
             throw new AppException(ErrorCode.USERNAME_OR_PASSWORD_INCORRECT);
         }
-
+        // Nếu login đúng thì xóa toàn bộ nhuwgnx lần login failed trước đó
         clearFailedLoginAttempt(identifier);
 
+        // Tạo accessToken và refreshToken
         String accessToken = generateToken(user, accessTokenValidSeconds, "access");
         String refreshToken = generateToken(user, refreshTokenValidSeconds, "refresh");
 
+        // Lưu refresh token xuống redis với tgian là refreshTokenValidSeconds
         redisService.setWithTtl(refreshTokenKey(user.getId()), refreshToken, refreshTokenValidSeconds);
 
         return LoginResponse.builder()
@@ -172,18 +171,21 @@ public class AuthenService {
                 .build();
     }
 
+    // Dùng để tạo access token mới cần truyền vô refreshToken
     public LoginResponse refreshToken(RefreshTokenRequest request) {
+        // Lấy refresh token
         String refreshToken = request.getRefreshToken();
+
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_REQUIRED);
         }
-
+        // Dùng để kiểm tra refresh token có đúng là token được tạo từ system hay không
         JWTClaimsSet refreshClaims = parseAndValidateToken(
                 refreshToken,
                 "refresh",
                 ErrorCode.REFRESH_TOKEN_INVALID
         );
-
+        // User id từ claim , sub
         String userId = refreshClaims.getSubject();
         if (userId == null) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_INVALID);
@@ -191,16 +193,18 @@ public class AuthenService {
 
         String key = refreshTokenKey(userId);
         String savedRefreshToken = redisService.get(key);
+        // Kiểm tra token được lưu có null hoặc không bằng refresh token được truyền vào hay ko => ném lỗi
         if (savedRefreshToken == null || !savedRefreshToken.equals(refreshToken)) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
-
+        // Lấy user từ id
         User user = userRepo.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USERNAME_NOT_EXISTED));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        // Ktra user đc verify chưa
         if (!user.isVerified()) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
         }
-
+        // Tạo ra new accessToken từ user .
         String newAccessToken = generateToken(user, accessTokenValidSeconds, "access");
 
         return LoginResponse.builder()
@@ -219,8 +223,9 @@ public class AuthenService {
                 .refreshToken(refreshedToken.getRefreshToken())
                 .build();
     }
-
+    // Logout truyền vào refresh token và access token
     public LogoutResponse logout(LogoutRequest request, String accessToken) {
+        // Get refreshToken
         String refreshToken = request.getRefreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_REQUIRED);
@@ -229,25 +234,26 @@ public class AuthenService {
         if (accessToken == null || accessToken.isBlank()) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
-
+        // Kiểm tra accessToken có còn hạn không
         JWTClaimsSet accessClaims = parseAndValidateToken(
                 accessToken,
                 "access",
                 ErrorCode.UNAUTHENTICATED
         );
+        // Kiểm tra refreshToken có còn hạn không
         JWTClaimsSet refreshClaims = parseAndValidateToken(
                 refreshToken,
                 "refresh",
                 ErrorCode.REFRESH_TOKEN_INVALID
         );
-
+        // Lấy userId của từng token để kiểm tra coi 2 token có thuộc cùng 1user  không
         String accessUserId = accessClaims.getSubject();
         String refreshUserId = refreshClaims.getSubject();
 
         if (accessUserId == null || refreshUserId == null || !accessUserId.equals(refreshUserId)) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
-
+        // Lấy refresh tokend dã được lưu dưới Redis
         String key = refreshTokenKey(refreshUserId);
         String savedRefreshToken = redisService.get(key);
 
@@ -258,14 +264,14 @@ public class AuthenService {
         if (!savedRefreshToken.equals(refreshToken)) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
-
+        // Xóa refresh token
         redisService.delete(key);
 
         return LogoutResponse.builder()
                 .loggedOut(true)
                 .build();
     }
-
+    // Dùng để test Token
     public TokenInfoResponse testToken(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
@@ -277,7 +283,7 @@ public class AuthenService {
         );
 
         User user = userRepo.findById(claims.getSubject())
-                .orElseThrow(() -> new AppException(ErrorCode.USERNAME_NOT_EXISTED));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         List<String> roles = user.getRoles().stream()
                 .map(Role::getName)
@@ -299,7 +305,7 @@ public class AuthenService {
                 .expiresAt(toIsoString(claims.getExpirationTime()))
                 .build();
     }
-
+    // Dùng để test Token
     private JWTClaimsSet parseAndValidateSupportedToken(String token, ErrorCode invalidTokenError) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
@@ -332,6 +338,7 @@ public class AuthenService {
         }
     }
 
+    // Kiểm tra token nhập vào có đúng là token được tạo ra từ hệ thôống không
     private JWTClaimsSet parseAndValidateToken(String token, String expectedType, ErrorCode invalidTokenError) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
@@ -370,14 +377,16 @@ public class AuthenService {
         }
         return claim.toString();
     }
-
+    // Dùng để tạo JWT token cần truyền user, tgian tồn tại của token, và type
     private String generateToken(User user, long validSeconds, String tokenType) {
         try {
+            // Thời gian hiện tại
             Instant now = Instant.now();
+            // Gắn scope cho user
             String scope = user.getRoles().stream()
                     .map(Role::getName)
                     .collect(Collectors.joining(" "));
-
+            // Tạo jwt claim,tức là nội dung
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                     .subject(user.getId())
                     .issuer("ash-project-be")
@@ -395,13 +404,14 @@ public class AuthenService {
                     new JWSHeader(JWSAlgorithm.HS512),
                     claimsSet
             );
+            // Kí xác thực jwt token
             signedJWT.sign(new MACSigner(jwtSignerKey.getBytes(StandardCharsets.UTF_8)));
             return signedJWT.serialize();
         } catch (JOSEException e) {
             throw new RuntimeException("Cannot create token", e);
         }
     }
-
+    // Tăng bộ đếm login sai trong redis
     private void recordFailedLoginAttempt(String identifier) {
         String key = loginAttemptKey(identifier);
         Long attempts = redisService.increment(key);
@@ -414,45 +424,45 @@ public class AuthenService {
             throw new AppException(ErrorCode.LOGIN_ATTEMPTS_EXCEEDED);
         }
     }
-
+    // Clear bộ đếm login sai trong redis
     private void clearFailedLoginAttempt(String identifier) {
         redisService.delete(loginAttemptKey(identifier));
     }
 
+    // Key của email. username trong redis
     private String loginAttemptKey(String identifier) {
         return "auth:login:attempts:" + identifier.toLowerCase(Locale.ROOT);
     }
-
+    // Key của refreshtoken lưu xuống redis
     private String refreshTokenKey(String userId) {
         return "auth:refresh:" + userId;
     }
-
+    // Key của user lưu tạm xuống redis
     private String pendingRegisterKey(String email) {
         return "register:pending:" + email;
     }
 
+
+    // Dùng để gửi otp dành cho quen mk
     public void sendOtpForgotPassword(ForgotPasswordRequest request) {
 
         User user = userRepo.findByEmail(request.getEmail())
                 .orElseThrow(() ->
                         new AppException(ErrorCode.EMAIL_NOT_EXISTED));
 
+        otpService.validateOtpSendAvailable(user.getEmail());
+
         String otp = otpService.generateOtp();
-        redisTemplate.opsForValue().set(
-                OTP_FORGOT_PREFIX + user.getEmail(),
-                otp,
-                5,
-                TimeUnit.MINUTES
-        );
+        redisService.setWithTtl(forgotOtpKey(user.getEmail()), otp, otpTtlSeconds);
+        otpService.markOtpSent(user.getEmail());
 
         mailService.sendOtp(user.getEmail(), otp);
     }
-
+    // Dfungf để xác thưực OTP
     public String verifyOtpForgotPassword(
-            VerifyOtpRequest request) {
+            VerifyForgotPasswordOtpRequest request) {
 
-        String savedOtp = redisTemplate.opsForValue()
-                .get(OTP_FORGOT_PREFIX + request.getEmail());
+        String savedOtp = redisService.get(forgotOtpKey(request.getEmail()));
 
         if (savedOtp == null) {
             throw new AppException(
@@ -464,21 +474,15 @@ public class AuthenService {
                     ErrorCode.FORGOT_PASSWORD_OTP_INVALID);
         }
 
-        redisTemplate.delete(
-                OTP_FORGOT_PREFIX + request.getEmail());
+        redisService.delete(forgotOtpKey(request.getEmail()));
 
         String resetToken = UUID.randomUUID().toString();
 
-        redisTemplate.opsForValue().set(
-                RESET_TOKEN_PREFIX + resetToken,
-                request.getEmail(),
-                5,
-                TimeUnit.MINUTES
-        );
+        redisService.setWithTtl(resetTokenKey(resetToken), request.getEmail(), otpTtlSeconds);
 
         return resetToken;
     }
-
+    // Tạo mật khẩu mởi
     public void resetPassword(
             ResetPasswordRequest request) {
 
@@ -489,9 +493,7 @@ public class AuthenService {
                     ErrorCode.RESET_PASSWORD_MISMATCH);
         }
 
-        String email = redisTemplate.opsForValue()
-                .get(RESET_TOKEN_PREFIX
-                        + request.getResetToken());
+        String email = redisService.get(resetTokenKey(request.getResetToken()));
 
         if (email == null) {
             throw new AppException(
@@ -507,17 +509,19 @@ public class AuthenService {
                 passwordEncoder.encode(
                         request.getNewPassword()));
 
-        userRepo.save(user);
+        try {
+            userRepo.save(user);
+        } catch (RuntimeException exception) {
+            throw new AppException(ErrorCode.RESET_PASSWORD_FAILED);
+        }
 
-        redisTemplate.delete(
-                RESET_TOKEN_PREFIX
-                        + request.getResetToken());
+        redisService.delete(resetTokenKey(request.getResetToken()));
     }
-
+    // Dùng để gửi lại otp khi queên mật khẩu
     public void resendForgotPasswordOtp(ForgotPasswordRequest request) {
         sendOtpForgotPassword(request);
     }
-
+    // Dùng để kiêm tra token của google
     private GoogleIdToken.Payload verifyGoogleToken(String token) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
@@ -544,7 +548,7 @@ public class AuthenService {
             throw new AppException(ErrorCode.GOOGLE_TOKEN_INVALID);
         }
     }
-
+    // tạo username mới khi đăng nhập bằng google
     private String generateGoogleUsername(String email) {
         String baseUsername = email.substring(0, email.indexOf("@"))
                 .replaceAll("[^a-zA-Z0-9]", "");
@@ -553,17 +557,33 @@ public class AuthenService {
             baseUsername = "user";
         }
 
+        baseUsername = baseUsername.substring(0, Math.min(baseUsername.length(), 20));
+
         String username = baseUsername;
         int counter = 1;
 
         while (userRepo.existsByUsername(username)) {
-            username = baseUsername + counter;
+            String suffix = String.valueOf(counter);
+            int prefixLength = Math.min(baseUsername.length(), Math.max(0, 20 - suffix.length()));
+            username = baseUsername.substring(0, prefixLength) + suffix;
+            if (username.length() > 20) {
+                username = username.substring(username.length() - 20);
+            }
             counter++;
         }
 
         return username;
     }
 
+    private String forgotOtpKey(String email) {
+        return OTP_FORGOT_PREFIX + email;
+    }
+
+    private String resetTokenKey(String resetToken) {
+        return RESET_TOKEN_PREFIX + resetToken;
+    }
+
+    // Tạo user mới khi đăng nhập bằng google
     private User createGoogleUser(String email, String fullname) {
         Role userRole = roleRepo.findById(RoleEnum.USER.name())
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
@@ -579,7 +599,7 @@ public class AuthenService {
 
         return userRepo.save(user);
     }
-
+    // Login bằng tài khoản google
     public LoginResponse googleLogin(GoogleLoginRequest request) {
         GoogleIdToken.Payload payload = verifyGoogleToken(request.getToken());
 

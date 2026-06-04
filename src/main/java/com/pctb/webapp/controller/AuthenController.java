@@ -41,7 +41,7 @@ public class AuthenController {
     AuthenService authenService;
     OtpService otpService;
 
-    @PostMapping("/register")
+    @PostMapping("/register") //
     public ApiResponse<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
         return ApiResponse.<RegisterResponse>builder()
                 .message("Register successfully. Please verify your email")
@@ -123,7 +123,7 @@ public class AuthenController {
 
     @PostMapping("/forgot-password/verify-otp")
     public ApiResponse<Map<String, String>> verifyOtpForgotPassword(
-            @Valid @RequestBody VerifyOtpRequest request) {
+            @Valid @RequestBody VerifyForgotPasswordOtpRequest request) {
 
         String resetToken =
                 authenService.verifyOtpForgotPassword(request);

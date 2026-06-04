@@ -17,7 +17,7 @@ import lombok.experimental.FieldDefaults;
 public class RedisRequest {
     @NotBlank(message = "KEY_REQUIRED")
     String key;
-
+    @NotBlank(message = "VALUE_REQUIRED")
     String value;
 
     @Min(value = 1, message = "TTL_INVALID")

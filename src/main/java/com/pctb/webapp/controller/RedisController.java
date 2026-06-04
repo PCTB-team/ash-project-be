@@ -26,7 +26,7 @@ public class RedisController {
 
     @PostMapping("/set")
     public ApiResponse<String> set(@RequestBody @Valid RedisRequest request) {
-        validateValue(request.getValue());
+
         redisService.set(request.getKey(), request.getValue());
 
         return ApiResponse.<String>builder()
@@ -37,7 +37,7 @@ public class RedisController {
 
     @PostMapping("/set-with-ttl")
     public ApiResponse<String> setWithTtl(@RequestBody @Valid RedisRequest request) {
-        validateValue(request.getValue());
+
         validateTtl(request.getTtlSeconds());
         redisService.setWithTtl(request.getKey(), request.getValue(), request.getTtlSeconds());
 
@@ -48,7 +48,7 @@ public class RedisController {
     }
 
     @GetMapping("/get")
-    public ApiResponse<String> get(@RequestParam String key) {
+    public ApiResponse<String> get(@RequestParam(required = false) String key) {
         validateKey(key);
 
         return ApiResponse.<String>builder()
@@ -58,7 +58,7 @@ public class RedisController {
     }
 
     @DeleteMapping("/delete")
-    public ApiResponse<Boolean> delete(@RequestParam String key) {
+    public ApiResponse<Boolean> delete(@RequestParam(required = false) String key) {
         validateKey(key);
         boolean existed = redisService.hasKey(key);
         redisService.delete(key);
@@ -70,7 +70,7 @@ public class RedisController {
     }
 
     @PostMapping("/increment")
-    public ApiResponse<Long> increment(@RequestParam String key) {
+    public ApiResponse<Long> increment(@RequestParam(required = false) String key) {
         validateKey(key);
 
         return ApiResponse.<Long>builder()
@@ -80,7 +80,9 @@ public class RedisController {
     }
 
     @PostMapping("/expire")
-    public ApiResponse<Boolean> expire(@RequestParam String key, @RequestParam Long ttlSeconds) {
+    public ApiResponse<Boolean> expire(
+            @RequestParam(required = false) String key,
+            @RequestParam(required = false) Long ttlSeconds) {
         validateKey(key);
         validateTtl(ttlSeconds);
 
@@ -91,7 +93,7 @@ public class RedisController {
     }
 
     @GetMapping("/ttl")
-    public ApiResponse<Long> ttl(@RequestParam String key) {
+    public ApiResponse<Long> ttl(@RequestParam(required = false) String key) {
         validateKey(key);
 
         return ApiResponse.<Long>builder()
@@ -106,11 +108,6 @@ public class RedisController {
         }
     }
 
-    private void validateValue(String value) {
-        if (value == null || value.isBlank()) {
-            throw new AppException(ErrorCode.VALUE_REQUIRED);
-        }
-    }
 
     private void validateTtl(Long ttlSeconds) {
         if (ttlSeconds == null || ttlSeconds < 1) {
