@@ -28,6 +28,15 @@ public class User {
 
     @Column(unique = true, nullable = false, length = 100)
     String email;
+
+    // Lưu URL public của avatar, file thật nằm trong local storage.
+    @Column(name = "avatar_url", length = 255)
+    String avatarUrl;
+
+    // Trường học do user tự nhập trong trang profile.
+    @Column(length = 100)
+    String school;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_role",

@@ -103,7 +103,7 @@ public enum ErrorCode {
     FULLNAME_INVALID(1032, "Full name is invalid", HttpStatus.BAD_REQUEST),
 
     // Dùng khi userId lấy từ token hợp lệ nhưng không tìm thấy user trong database.
-    USER_NOT_FOUND(1033, "User not found", HttpStatus.NOT_FOUND),
+    USER_NOT_FOUND(1204, "User not found", HttpStatus.NOT_FOUND),
 
     // Dùng khi key của Redis API bị trống.
     KEY_REQUIRED(1101, "Key is required", HttpStatus.BAD_REQUEST),
@@ -118,7 +118,26 @@ public enum ErrorCode {
     REQUEST_BODY_INVALID(1201, "Request body is invalid", HttpStatus.BAD_REQUEST),
 
     // Dùng khi query/path parameter bị thiếu, sai kiểu dữ liệu, hoặc không map được về ErrorCode cụ thể hơn.
-    REQUEST_PARAMETER_INVALID(1202, "Request parameter is invalid", HttpStatus.BAD_REQUEST);
+    REQUEST_PARAMETER_INVALID(1202, "Request parameter is invalid", HttpStatus.BAD_REQUEST),
+
+    // Nhóm lỗi update profile dùng mã 12xx theo quy định của team.
+    PROFILE_FULLNAME_INVALID(1203, "Full name is invalid", HttpStatus.BAD_REQUEST),
+
+    OLD_PASSWORD_INCORRECT(1205, "Old password is incorrect", HttpStatus.BAD_REQUEST),
+
+    NEW_PASSWORD_SAME_AS_OLD(1206, "New password must be different from old password", HttpStatus.BAD_REQUEST),
+
+    PROFILE_PASSWORD_INVALID(1207, "Password must be at least 8 characters and contain at least 1 special character", HttpStatus.BAD_REQUEST),
+
+    PROFILE_CONFIRM_PASSWORD_NOT_MATCH(1208, "Confirm password does not match new password", HttpStatus.BAD_REQUEST),
+
+    AVATAR_TYPE_INVALID(1209, "Avatar type is invalid. Only png, jpg, jpeg are supported", HttpStatus.BAD_REQUEST),
+
+    AVATAR_SIZE_EXCEEDED(1210, "Avatar size must not exceed 5MB", HttpStatus.BAD_REQUEST),
+
+    AVATAR_UPLOAD_FAILED(1211, "Avatar upload failed", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    PROFILE_SCHOOL_INVALID(1212, "School is invalid", HttpStatus.BAD_REQUEST);
 
     private final int code;
 
