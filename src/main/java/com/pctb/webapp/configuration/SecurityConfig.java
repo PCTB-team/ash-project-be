@@ -23,6 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -31,6 +32,12 @@ import java.util.List;
 public class SecurityConfig {
     @Value("${jwt.signerKey}")
     private String jwtSecret;
+
+    @Value("${app.cors.allowed-origins}")
+    private String corsAllowedOrigins;
+
+    @Value("${app.cors.allowed-origin-patterns:}")
+    private String corsAllowedOriginPatterns;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
@@ -54,7 +61,12 @@ public class SecurityConfig {
                                 "/increment").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
+                        // Cho phép FE load avatar đã upload mà không cần quyền ADMIN.
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
+                        // Profile chỉ yêu cầu đăng nhập, khác với GET /user cần ADMIN.
+                        .requestMatchers(HttpMethod.GET, "/user/profile").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/user/profile").authenticated()
                         .requestMatchers("/user").hasRole("ADMIN")
                         .anyRequest().authenticated()
 
@@ -98,12 +110,8 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-                List.of(
-                        "http://localhost:3000",
-                        "http://localhost:5173"
-                )
-        );
+        configuration.setAllowedOrigins(parseCorsAllowedOrigins());
+        configuration.setAllowedOriginPatterns(parseCorsAllowedOriginPatterns());
 
         configuration.setAllowedMethods(
                 List.of(
@@ -130,5 +138,19 @@ public class SecurityConfig {
         );
 
         return source;
+    }
+
+    private List<String> parseCorsAllowedOrigins() {
+        return Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
+    }
+
+    private List<String> parseCorsAllowedOriginPatterns() {
+        return Arrays.stream(corsAllowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
     }
 }
