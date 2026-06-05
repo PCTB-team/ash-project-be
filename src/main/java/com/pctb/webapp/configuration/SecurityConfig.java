@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/set-with-ttl",
                                 "/increment").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/groups/**").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .requestMatchers("/user").hasRole("ADMIN")
