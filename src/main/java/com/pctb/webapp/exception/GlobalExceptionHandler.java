@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 // ================= Class dùng để xử lý , những dòng thông báo lỗi khi có lỗi ============
 // Spring gọi các method @ExceptionHandler bằng reflection nên code sẽ không có caller trực tiếp.
 @SuppressWarnings("unused")
@@ -48,6 +49,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = HttpMessageNotReadableException.class)
     ResponseEntity<ApiResponse> handlingHttpMessageNotReadableException() {
         return buildErrorResponse(ErrorCode.REQUEST_BODY_INVALID);
+    }
+
+    // Xử lý lỗi file quá dung lượng trước khi request đi vào UserService.
+    @ExceptionHandler(value = MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiResponse> handlingMaxUploadSizeExceededException() {
+        return buildErrorResponse(ErrorCode.AVATAR_SIZE_EXCEEDED);
     }
 
     private ErrorCode resolveRequestParameterError(String parameterName) {
