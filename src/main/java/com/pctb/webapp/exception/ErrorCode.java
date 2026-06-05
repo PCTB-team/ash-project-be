@@ -153,6 +153,59 @@ public enum ErrorCode {
     // Dùng khi query/path parameter bị thiếu, sai kiểu dữ liệu, hoặc không map được về ErrorCode cụ thể hơn.
     REQUEST_PARAMETER_INVALID(1202, "Request parameter is invalid", HttpStatus.BAD_REQUEST),
 
+    // Tiêu đề tài liệu bị bỏ trống hoặc chỉ chứa khoảng trắng
+    DOCUMENT_TITLE_REQUIRED(1301, "Document title is required", HttpStatus.BAD_REQUEST),
+
+    // Người dùng không gửi file trong request upload
+    FILE_REQUIRED(1302, "File is required", HttpStatus.BAD_REQUEST),
+
+    // Kích thước file vượt quá giới hạn cho phép của hệ thống
+    FILE_TOO_LARGE(1303, "File exceeds maximum allowed size", HttpStatus.BAD_REQUEST),
+
+    // Định dạng file không nằm trong danh sách được hỗ trợ
+// (pdf, docx, png, jpg, jpeg, txt, mp3, mp4, ppt, pptx)
+    FILE_TYPE_NOT_SUPPORTED(1304, "File type is not supported", HttpStatus.BAD_REQUEST),
+
+    // Phần mở rộng file và MIME Type thực tế không khớp nhau
+// Ví dụ: đổi tên virus.exe thành document.pdf
+    INVALID_MIME_TYPE(1305, "Invalid mime type or fake file extension", HttpStatus.BAD_REQUEST),
+
+    // Dung lượng lưu trữ còn lại của người dùng không đủ để upload file
+    STORAGE_NOT_ENOUGH(1306, "Cloud storage is not enough. Please upgrade your storage", HttpStatus.FORBIDDEN),
+
+    // Đã tồn tại file cùng tên và người dùng không chọn chế độ ghi đè (Replace)
+    FILE_ALREADY_EXISTS(1307, "File already exists", HttpStatus.CONFLICT),
+
+    // Upload thất bại do lỗi hệ thống
+// Ví dụ: lỗi Cloudinary, AWS S3, Database hoặc kết nối mạng
+    UPLOAD_FAILED(1308, "Upload failed", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // Không tìm thấy phiên upload
+// Có thể phiên đã hết hạn, bị xóa hoặc id không hợp lệ
+    UPLOAD_SESSION_NOT_FOUND(1309, "Upload session not found", HttpStatus.NOT_FOUND),
+
+    // Không thể tạm dừng upload ở trạng thái hiện tại
+// Ví dụ: upload đã hoàn thành, đã hủy hoặc đang tạm dừng
+    UPLOAD_CANNOT_BE_PAUSED(1310, "Upload cannot be paused", HttpStatus.BAD_REQUEST),
+
+    // Không thể tiếp tục upload ở trạng thái hiện tại
+// Ví dụ: upload đã hoàn thành, đã hủy hoặc chưa từng bị tạm dừng
+    UPLOAD_CANNOT_BE_RESUMED(1311, "Upload cannot be resumed", HttpStatus.BAD_REQUEST),
+
+    // Không thể hủy upload ở trạng thái hiện tại
+// Ví dụ: upload đã hoàn thành hoặc đã bị hủy trước đó
+    UPLOAD_CANNOT_BE_CANCELED(1312, "Upload cannot be canceled", HttpStatus.BAD_REQUEST),
+
+    DOCUMENT_NOT_FOUND(1313, "Document not found", HttpStatus.NOT_FOUND),
+
+    DOCUMENT_ACCESS_DENIED(1314, "Document access denied", HttpStatus.FORBIDDEN),
+
+    DOCUMENT_FILE_NAME_REQUIRED(1315, "Document file name is required", HttpStatus.BAD_REQUEST),
+
+    DOCUMENT_EXTENSION_CANNOT_CHANGE(1316, "Document file extension cannot be changed", HttpStatus.BAD_REQUEST),
+
+    DOCUMENT_NOT_IN_TRASH(1317, "Document is not in trash", HttpStatus.BAD_REQUEST);
+
     // Nhóm lỗi update profile dùng mã 12xx theo quy định của team.
     PROFILE_FULLNAME_INVALID(1203, "Full name is invalid", HttpStatus.BAD_REQUEST),
 
