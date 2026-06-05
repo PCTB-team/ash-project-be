@@ -157,7 +157,7 @@ public enum ErrorCode {
     DOCUMENT_TITLE_REQUIRED(1301, "Document title is required", HttpStatus.BAD_REQUEST),
 
     // Người dùng không gửi file trong request upload
-    FILE_REQUIRED(1302, "File is required", HttpStatus.BAD_REQUEST),
+    FILE_REQUIRED_UPLOAD(1302, "File is required", HttpStatus.BAD_REQUEST),
 
     // Kích thước file vượt quá giới hạn cho phép của hệ thống
     FILE_TOO_LARGE(1303, "File exceeds maximum allowed size", HttpStatus.BAD_REQUEST),
@@ -204,7 +204,7 @@ public enum ErrorCode {
 
     DOCUMENT_EXTENSION_CANNOT_CHANGE(1316, "Document file extension cannot be changed", HttpStatus.BAD_REQUEST),
 
-    DOCUMENT_NOT_IN_TRASH(1317, "Document is not in trash", HttpStatus.BAD_REQUEST);
+    DOCUMENT_NOT_IN_TRASH(1317, "Document is not in trash", HttpStatus.BAD_REQUEST),
 
     // Nhóm lỗi update profile dùng mã 12xx theo quy định của team.
     PROFILE_FULLNAME_INVALID(1203, "Full name is invalid", HttpStatus.BAD_REQUEST),

@@ -50,7 +50,7 @@ public class FileValidationService {
     // Hàm kiểm tra validate, truyền va title của file, multipartFile tức là các file được upload lên
     public String validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new AppException(ErrorCode.FILE_REQUIRED);
+            throw new AppException(ErrorCode.FILE_REQUIRED_UPLOAD);
         }
 
         if (file.getSize() > maxFileSize) {
