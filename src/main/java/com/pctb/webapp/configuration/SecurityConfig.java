@@ -60,6 +60,7 @@ public class SecurityConfig {
                                 "/set-with-ttl",
                                 "/increment").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/groups/**").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
                         // Cho phép FE load avatar đã upload mà không cần quyền ADMIN.
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
