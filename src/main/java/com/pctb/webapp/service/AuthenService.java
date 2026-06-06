@@ -22,9 +22,11 @@ import com.pctb.webapp.dto.response.TokenInfoResponse;
 import com.pctb.webapp.entity.Role;
 import com.pctb.webapp.entity.RoleEnum;
 import com.pctb.webapp.entity.User;
+import com.pctb.webapp.entity.UserLoginHistory;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.repository.RoleRepo;
+import com.pctb.webapp.repository.UserLoginHistoryRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,8 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,6 +53,7 @@ public class AuthenService {
     static String RESET_TOKEN_PREFIX = "RESET_TOKEN:";
 
     UserRepo userRepo;
+    UserLoginHistoryRepo userLoginHistoryRepo;
 
     RoleRepo roleRepo;
     PasswordEncoder passwordEncoder;
@@ -156,6 +161,7 @@ public class AuthenService {
         }
         // Nếu login đúng thì xóa toàn bộ nhuwgnx lần login failed trước đó
         clearFailedLoginAttempt(identifier);
+        recordSuccessfulLogin(user);
 
         // Tạo accessToken và refreshToken
         String accessToken = generateToken(user, accessTokenValidSeconds, "access");
@@ -411,7 +417,21 @@ public class AuthenService {
             throw new RuntimeException("Cannot create token", e);
         }
     }
-    // Tăng bộ đếm login sai trong redis
+    // Record one successful login entry per user per calendar day.
+    private void recordSuccessfulLogin(User user) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        UserLoginHistory history = userLoginHistoryRepo.findByUserAndLoginDate(user, today)
+                .orElseGet(() -> UserLoginHistory.builder()
+                        .user(user)
+                        .loginDate(today)
+                        .build());
+
+        history.setLoggedInAt(now);
+        userLoginHistoryRepo.save(history);
+    }
+
     private void recordFailedLoginAttempt(String identifier) {
         String key = loginAttemptKey(identifier);
         Long attempts = redisService.increment(key);
@@ -611,8 +631,10 @@ public class AuthenService {
 
         if (!user.isVerified()) {
             user.setVerified(true);
-            userRepo.save(user);
+            user = userRepo.save(user);
         }
+
+        recordSuccessfulLogin(user);
 
         String accessToken = generateToken(user, accessTokenValidSeconds, "access");
         String refreshToken = generateToken(user, refreshTokenValidSeconds, "refresh");

@@ -22,4 +22,6 @@ public class UserProfileResponse {
     String fullname;
     String avatarUrl;
     String school;
+    long documentCount;
+    long consecutiveLoginDays;
 }

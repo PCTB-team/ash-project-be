@@ -24,4 +24,7 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
 
     @Query("select coalesce(sum(d.fileSize), 0) from Document d where d.owner = :owner")
     Long sumFileSizeByOwner(@Param("owner") User owner);
+
+    @Query("select count(d) from Document d where d.owner = :owner and (d.deleted = false or d.deleted is null)")
+    long countActiveByOwner(@Param("owner") User owner);
 }
