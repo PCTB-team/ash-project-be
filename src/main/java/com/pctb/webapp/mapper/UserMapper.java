@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.response.UserResponse;
 import com.pctb.webapp.dto.response.UserProfileResponse;
 import com.pctb.webapp.entity.User;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import java.util.List;
 
@@ -12,6 +13,8 @@ public interface UserMapper {
     UserResponse toUserResponse(User user);
 
     // Chuyển entity User sang profile response để không trả password ra ngoài.
+    @Mapping(target = "documentCount", ignore = true)
+    @Mapping(target = "consecutiveLoginDays", ignore = true)
     UserProfileResponse toUserProfileResponse(User user);
     // Tự động chuyển list từ user sang list của userResponse
     List<UserResponse> toUserResponseList(List<User> userList);

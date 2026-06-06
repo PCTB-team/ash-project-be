@@ -7,6 +7,8 @@ import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.mapper.UserMapper;
+import com.pctb.webapp.repository.DocumentRepo;
+import com.pctb.webapp.repository.UserLoginHistoryRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -21,6 +24,8 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE,makeFinal = true)
 public class UserService {
     UserRepo userRepo;
+    DocumentRepo documentRepo;
+    UserLoginHistoryRepo userLoginHistoryRepo;
     UserMapper userMapper;
     LocalStorageService localStorageService;
     PasswordEncoder passwordEncoder;
@@ -37,7 +42,7 @@ public class UserService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        return userMapper.toUserProfileResponse(user);
+        return buildUserProfileResponse(user);
     }
 
     // Luồng chính của update profile: validate dữ liệu, lưu avatar nếu có, đổi password nếu có, rồi lưu DB.
@@ -66,14 +71,44 @@ public class UserService {
                 localStorageService.deleteAvatar(oldAvatarUrl);
             }
 
-            return userMapper.toUserProfileResponse(savedUser);
+            return buildUserProfileResponse(savedUser);
         } catch (RuntimeException exception) {
             localStorageService.deleteAvatar(newAvatarUrl);
             throw exception;
         }
     }
 
-    // Kiểm tra họ tên bắt buộc nhập và không vượt quá giới hạn lưu trong DB.
+    // Build profile response with statistics that are derived from related tables.
+    private UserProfileResponse buildUserProfileResponse(User user) {
+        UserProfileResponse response = userMapper.toUserProfileResponse(user);
+        response.setDocumentCount(documentRepo.countActiveByOwner(user));
+        response.setConsecutiveLoginDays(countConsecutiveLoginDays(user));
+
+        return response;
+    }
+
+    private long countConsecutiveLoginDays(User user) {
+        List<LocalDate> loginDates = userLoginHistoryRepo.findLoginDatesByUserOrderByLoginDateDesc(user);
+        if (loginDates.isEmpty()) {
+            return 0;
+        }
+
+        long consecutiveDays = 0;
+        LocalDate expectedDate = loginDates.get(0);
+
+        for (LocalDate loginDate : loginDates) {
+            if (!loginDate.equals(expectedDate)) {
+                break;
+            }
+
+            consecutiveDays++;
+            expectedDate = expectedDate.minusDays(1);
+        }
+
+        return consecutiveDays;
+    }
+
+    // Validate fullname before saving profile changes.
     private void validateFullname(String fullname) {
         if (fullname == null || fullname.isBlank() || fullname.length() > 100) {
             throw new AppException(ErrorCode.PROFILE_FULLNAME_INVALID);
