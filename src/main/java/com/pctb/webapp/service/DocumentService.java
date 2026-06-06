@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,19 +50,7 @@ public class DocumentService {
         List<DocumentResponse> documentResponses = new ArrayList<>();
 
         for (Document document : documents) {
-            DocumentResponse documentResponse = DocumentResponse.builder()
-                    .documentId(document.getId())
-                    .fileName(document.getFileName())
-                    .fileExtension(document.getFileExtension())
-                    .mimeType(document.getMimeType())
-                    .fileSize(document.getFileSize())
-                    .storageUrl(document.getStorageUrl())
-                    .status(document.getStatus().name())
-                    .deleted(Boolean.TRUE.equals(document.getDeleted()))
-                    .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
-                    .build();
-
-            documentResponses.add(documentResponse);
+            documentResponses.add(buildDocumentResponse(document));
         }
 
         return documentResponses;
@@ -116,19 +105,7 @@ public class DocumentService {
         List<DocumentResponse> documentResponses = new ArrayList<>();
 
         for (Document document : documents) {
-            DocumentResponse documentResponse = DocumentResponse.builder()
-                    .documentId(document.getId())
-                    .fileName(document.getFileName())
-                    .fileExtension(document.getFileExtension())
-                    .mimeType(document.getMimeType())
-                    .fileSize(document.getFileSize())
-                    .storageUrl(document.getStorageUrl())
-                    .status(document.getStatus().name())
-                    .deleted(Boolean.TRUE.equals(document.getDeleted()))
-                    .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
-                    .build();
-
-            documentResponses.add(documentResponse);
+            documentResponses.add(buildDocumentResponse(document));
         }
 
         return documentResponses;
@@ -346,8 +323,47 @@ public class DocumentService {
                 .fileSize(document.getFileSize())
                 .storageUrl(document.getStorageUrl())
                 .status(document.getStatus().name())
+                .uploadedAt(document.getCreatedAt() == null ? null : document.getCreatedAt().toString())
+                .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(document.getDeleted()))
                 .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
                 .build();
+    }
+
+    private String formatTimeSinceUpload(LocalDateTime uploadedAt) {
+        if (uploadedAt == null) {
+            return null;
+        }
+
+        Duration duration = Duration.between(uploadedAt, LocalDateTime.now());
+        if (duration.isNegative() || duration.getSeconds() < 5) {
+            return "v\u1eeba xong";
+        }
+
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + " gi\u00e2y tr\u01b0\u1edbc";
+        }
+
+        long minutes = duration.toMinutes();
+        if (minutes < 60) {
+            return minutes + " ph\u00fat tr\u01b0\u1edbc";
+        }
+
+        long hours = duration.toHours();
+        if (hours < 24) {
+            return hours + " gi\u1edd tr\u01b0\u1edbc";
+        }
+
+        long days = duration.toDays();
+        if (days < 30) {
+            return days + " ng\u00e0y tr\u01b0\u1edbc";
+        }
+
+        if (days < 365) {
+            return days / 30 + " th\u00e1ng tr\u01b0\u1edbc";
+        }
+
+        return days / 365 + " n\u0103m tr\u01b0\u1edbc";
     }
 }

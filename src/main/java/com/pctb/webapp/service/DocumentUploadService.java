@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -49,34 +50,36 @@ public class DocumentUploadService {
         User owner = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        // Sẽ kiểm tra mimeType của file và lấy ra mimeType
+        // Kiểm tra mimeType thật của file
         String realMimeType = fileValidationService.validate(file);
-        // Lấy ra tên gốc của file
+        // Lấy tên gốc của file
         String originalFileName = cleanOriginalFileName(file.getOriginalFilename());
-        // Kiểm tra xem extension của file từ name của file gốc
+        // Lấy extension từ tên file gốc
         String extension = fileValidationService.getExtension(originalFileName);
-        //Tên file sẽ lưu
+        // Tên file sẽ lưu
         String storedFileName = buildStoredFileName(originalFileName);
 
-        boolean shouldReplace = Boolean.TRUE.equals(replaceExisting); // Coi có cho phép thay đổi không
+        boolean shouldReplace = Boolean.TRUE.equals(replaceExisting); // Kiểm tra có cho phép thay đổi không
 
-        // Tìm coi document đã tồn tại chưa
+        // Tìm document đã tồn tại chưa
         Document existingDocument = documentRepo.findByOwnerAndFileName(owner, originalFileName)
                 .orElse(null);
-        // Nếu đã tồn tại và cho phép thay đổi đang false
+        // Nếu đã tồn tại và không cho phép thay đổi thì báo lỗi
         if (existingDocument != null && !shouldReplace) {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
 
         validateStorageCapacity(owner, existingDocument, file.getSize());
 
-        // Nếu đã tồn tại và cho phép thay đổi thì sẽ xóa trong storageService và xóa trong DB
+        // Nếu đã tồn tại và cho phép thay đổi thì xóa file cũ trong storage và DB
         if (existingDocument != null) {
             storageService.delete(existingDocument.getStorageUrl());
             documentRepo.delete(existingDocument);
         }
-        // Lấy url
+        // Lấy url lưu trữ
         String storageUrl = storageService.upload(file, storedFileName);
+
+        LocalDateTime now = LocalDateTime.now();
 
         Document document = Document.builder()
                 .title(originalFileName)
@@ -87,8 +90,8 @@ public class DocumentUploadService {
                 .storageUrl(storageUrl)
                 .status(UploadStatus.COMPLETED)
                 .owner(owner)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .deleted(false)
                 .build();
 
@@ -102,9 +105,11 @@ public class DocumentUploadService {
                 .fileSize(document.getFileSize())
                 .storageUrl(document.getStorageUrl())
                 .status(document.getStatus().name())
+                .uploadedAt(document.getCreatedAt().toString())
+                .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .build();
     }
-    // Lấy tên gốc của file vidu name.pdf chứ không lấy nguyên 1 path
+    // Lấy tên gốc của file, ví dụ name.pdf thay vì nguyên path
     private String cleanOriginalFileName(String originalFileName) {
         String cleanPath = StringUtils.cleanPath(originalFileName);
         int slashIndex = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
@@ -119,7 +124,44 @@ public class DocumentUploadService {
     private String buildStoredFileName(String originalFileName) {
         return originalFileName;
     }
-    // Kiểm tra xem khi upload file thì dung lượng project có vượt quá dung lượng cho phép của User không
+
+    private String formatTimeSinceUpload(LocalDateTime uploadedAt) {
+        if (uploadedAt == null) {
+            return null;
+        }
+
+        Duration duration = Duration.between(uploadedAt, LocalDateTime.now());
+        if (duration.isNegative() || duration.getSeconds() < 5) {
+            return "v\u1eeba xong";
+        }
+
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + " gi\u00e2y tr\u01b0\u1edbc";
+        }
+
+        long minutes = duration.toMinutes();
+        if (minutes < 60) {
+            return minutes + " ph\u00fat tr\u01b0\u1edbc";
+        }
+
+        long hours = duration.toHours();
+        if (hours < 24) {
+            return hours + " gi\u1edd tr\u01b0\u1edbc";
+        }
+
+        long days = duration.toDays();
+        if (days < 30) {
+            return days + " ng\u00e0y tr\u01b0\u1edbc";
+        }
+
+        if (days < 365) {
+            return days / 30 + " th\u00e1ng tr\u01b0\u1edbc";
+        }
+
+        return days / 365 + " n\u0103m tr\u01b0\u1edbc";
+    }
+
     private void validateStorageCapacity(User owner, Document existingDocument, long newFileSize) {
         Long usedStorageResult = documentRepo.sumFileSizeByOwner(owner);
         long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;

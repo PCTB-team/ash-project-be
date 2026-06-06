@@ -22,4 +22,8 @@ public class DocumentUploadResponse {
     String storageUrl;
 
     String status;
+
+    String uploadedAt;
+
+    String timeSinceUpload;
 }
