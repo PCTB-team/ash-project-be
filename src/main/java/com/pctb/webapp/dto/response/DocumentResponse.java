@@ -24,6 +24,10 @@ public class DocumentResponse {
 
     String status;
 
+    String uploadedAt;
+
+    String timeSinceUpload;
+
     Boolean deleted;
 
     String deletedAt;
