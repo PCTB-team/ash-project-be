@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -40,13 +41,13 @@ public class DocumentUploadService {
 
     // Upload document
     public DocumentUploadResponse upload(
-            MultipartFile file,
-            Boolean replaceExisting,
-            JwtAuthenticationToken authentication
+            MultipartFile file,  // Đại diện cho file
+            Boolean replaceExisting, // Có cho phép thay thế file đã tồn tại hay không
+            JwtAuthenticationToken authentication // token authen
     ) {
         // Lấy user id
         String userId = authentication.getName();
-
+        //
         User owner = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -56,8 +57,8 @@ public class DocumentUploadService {
         String originalFileName = cleanOriginalFileName(file.getOriginalFilename());
         // Lấy extension từ tên file gốc
         String extension = fileValidationService.getExtension(originalFileName);
-        // Tên file sẽ lưu
-        String storedFileName = buildStoredFileName(originalFileName);
+        // Physical storage path uses UUID to avoid filename conflicts.
+        String storedFileName = buildStoredFileName(owner.getId(), extension);
 
         boolean shouldReplace = Boolean.TRUE.equals(replaceExisting); // Kiểm tra có cho phép thay đổi không
 
@@ -104,12 +105,22 @@ public class DocumentUploadService {
                 .mimeType(document.getMimeType())
                 .fileSize(document.getFileSize())
                 .storageUrl(document.getStorageUrl())
+                .viewUrl(buildDocumentViewUrl(document.getId()))
+                .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
                 .uploadedAt(document.getCreatedAt().toString())
                 .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .build();
     }
     // Lấy tên gốc của file, ví dụ name.pdf thay vì nguyên path
+    private String buildDocumentViewUrl(String documentId) {
+        return "/documents/" + documentId + "/view";
+    }
+
+    private String buildDocumentDownloadUrl(String documentId) {
+        return "/documents/" + documentId + "/download";
+    }
+
     private String cleanOriginalFileName(String originalFileName) {
         String cleanPath = StringUtils.cleanPath(originalFileName);
         int slashIndex = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
@@ -121,8 +132,8 @@ public class DocumentUploadService {
         return cleanPath;
     }
 
-    private String buildStoredFileName(String originalFileName) {
-        return originalFileName;
+    private String buildStoredFileName(String userId, String extension) {
+        return "documents/" + userId + "/" + UUID.randomUUID() + "." + extension;
     }
 
     private String formatTimeSinceUpload(LocalDateTime uploadedAt) {

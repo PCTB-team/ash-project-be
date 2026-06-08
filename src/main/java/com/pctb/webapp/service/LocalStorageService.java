@@ -133,8 +133,8 @@ public class LocalStorageService implements StorageService {
                 throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
             }
 
-            // Tao Resource de controller co the tra file ve client
-            Resource resource = new UrlResource(filePath.toUri());
+            // Tao Resource de controller co the tra file ve client , vì resource cho biết thông tin về file đang nằm ở đâu
+            Resource resource = new UrlResource(filePath.toUri()); // chuyển \ của windown sang /
 
             // Kiem tra resource co doc duoc khong
             if (!resource.exists() || !resource.isReadable()) {
