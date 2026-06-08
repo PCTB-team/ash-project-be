@@ -269,14 +269,10 @@ public class DocumentService {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
 
-        // Doi ten file trong storage
-        String newStorageUrl = storageService.rename(document.getStorageUrl(), newFileName);
-
-        // Update metadata trong database
+        // Physical file uses a separate storage key, so rename only updates display/download metadata.
         document.setTitle(newFileName);
         document.setFileName(newFileName);
         document.setFileExtension(newExtension);
-        document.setStorageUrl(newStorageUrl);
         document.setUpdatedAt(LocalDateTime.now());
 
         document = documentRepo.save(document);
@@ -322,12 +318,22 @@ public class DocumentService {
                 .mimeType(document.getMimeType())
                 .fileSize(document.getFileSize())
                 .storageUrl(document.getStorageUrl())
+                .viewUrl(buildDocumentViewUrl(document.getId()))
+                .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
                 .uploadedAt(document.getCreatedAt() == null ? null : document.getCreatedAt().toString())
                 .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(document.getDeleted()))
                 .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
                 .build();
+    }
+
+    private String buildDocumentViewUrl(String documentId) {
+        return "/documents/" + documentId + "/view";
+    }
+
+    private String buildDocumentDownloadUrl(String documentId) {
+        return "/documents/" + documentId + "/download";
     }
 
     private String formatTimeSinceUpload(LocalDateTime uploadedAt) {

@@ -56,16 +56,17 @@ public class DocumentController {
     ) {
         DownloadDocumentResponse response = documentService.downloadMyDocument(documentId, authentication);
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(response.getMimeType()))
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.attachment()
-                                .filename(response.getFileName())
-                                .build()
-                                .toString()
-                )
-                .body(response.getResource());
+        return buildFileResponse(response, ContentDisposition.attachment());
+    }
+
+    @GetMapping("/{documentId}/view")
+    public ResponseEntity<Resource> viewMyDocument(
+            @PathVariable String documentId,
+            JwtAuthenticationToken authentication
+    ) {
+        DownloadDocumentResponse response = documentService.downloadMyDocument(documentId, authentication);
+
+        return buildFileResponse(response, ContentDisposition.inline());
     }
 
     @DeleteMapping("/{documentId}")
@@ -111,5 +112,21 @@ public class DocumentController {
                 .message("Update document successfully")
                 .result(documentService.updateMyDocument(documentId, request, authentication))
                 .build();
+    }
+
+    private ResponseEntity<Resource> buildFileResponse(
+            DownloadDocumentResponse response,
+            ContentDisposition.Builder contentDispositionBuilder
+    ) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(response.getMimeType()))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        contentDispositionBuilder
+                                .filename(response.getFileName())
+                                .build()
+                                .toString()
+                )
+                .body(response.getResource());
     }
 }

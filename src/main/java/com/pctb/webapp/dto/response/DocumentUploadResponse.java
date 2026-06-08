@@ -21,6 +21,10 @@ public class DocumentUploadResponse {
 
     String storageUrl;
 
+    String viewUrl;
+
+    String downloadUrl;
+
     String status;
 
     String uploadedAt;
