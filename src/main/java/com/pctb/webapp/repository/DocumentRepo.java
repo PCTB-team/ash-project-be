@@ -18,14 +18,7 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
 
     List<Document> findByOwnerOrderByCreatedAtDesc(User owner);
 
-    @Query("""
-            select d from Document d
-            where d.owner = :owner
-              and d.group is null
-              and (d.deleted = false or d.deleted is null)
-            order by d.createdAt desc
-            """)
-    List<Document> findActiveByOwner(@Param("owner") User owner);
+
 
     @Query("""
             select d from Document d
@@ -34,6 +27,9 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
               and d.deleted = true
             order by d.deletedAt desc
             """)
+    List<Document> findActiveByOwner(@Param("owner") User owner);
+
+
     @Query("select d from Document d where d.owner.id = :ownerId and (d.deleted = false or d.deleted is null) order by d.createdAt desc")
     List<Document> findActiveByOwnerId(@Param("ownerId") String ownerId);
 
@@ -68,7 +64,8 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
             order by d.createdAt desc
             """)
     List<Document> findActiveByGroup(@Param("group") StudyGroup group);
-}
     @Query("select count(d) from Document d where d.owner = :owner and (d.deleted = false or d.deleted is null)")
     long countActiveByOwner(@Param("owner") User owner);
 }
+
+
