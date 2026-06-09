@@ -51,6 +51,8 @@ public class Document {
     User owner;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    StudyGroup group;
     @JoinColumn(name = "folder_id")
     Folder folder;
 

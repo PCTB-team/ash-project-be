@@ -127,25 +127,27 @@ public enum ErrorCode {
     INVALID_FILE_FORMAT(1107, "Unsupported file format. Only specific formats are allowed", HttpStatus.BAD_REQUEST),
 
     // Dùng khi thành viên thường cố tình thực hiện quyền của OWNER hoặc ADMIN (như kích người, xóa nhóm).
-    UNAUTHORIZED_GROUP_ACTION(1108, "You do not have permission to perform this action in the group", HttpStatus.FORBIDDEN),
+    UNAUTHORIZED_GROUP_ACTION(1213, "You do not have permission to perform this action in the group", HttpStatus.FORBIDDEN),
 
     // Dùng khi người dùng cần tương tác (ví dụ: kích thành viên) không nằm trong nhóm học tập này.
-    MEMBER_NOT_FOUND_IN_GROUP(1109, "The specified user is not a member of this group", HttpStatus.NOT_FOUND),
+    MEMBER_NOT_FOUND_IN_GROUP(1214, "The specified user is not a member of this group", HttpStatus.NOT_FOUND),
 
     // Dùng khi chủ nhóm (OWNER) cố tình rời nhóm khi chưa nhường quyền hoặc giải tán nhóm.
-    OWNER_CANNOT_LEAVE_GROUP(1110, "Group owner cannot leave the group without assigning a new owner", HttpStatus.BAD_REQUEST),
+    OWNER_CANNOT_LEAVE_GROUP(1215, "Group owner cannot leave the group without assigning a new owner", HttpStatus.BAD_REQUEST),
 
     // Dùng khi mã mời hoặc lời mời tham gia vào nhóm học tập đã bị hủy hoặc hết hạn sử dụng.
-    GROUP_INVITATION_EXPIRED(1111, "The group invitation code or link has expired", HttpStatus.BAD_REQUEST),
+    GROUP_INVITATION_EXPIRED(1216, "The group invitation code or link has expired", HttpStatus.BAD_REQUEST),
 
     // Dùng khi không tìm thấy nhóm dựa trên Join Code người dùng cung cấp.
-    GROUP_NOT_FOUND(1112, "Group not found with the provided join code", HttpStatus.NOT_FOUND),
+    GROUP_NOT_FOUND(1217, "Group not found with the provided join code", HttpStatus.NOT_FOUND),
 
     // Dùng khi người dùng thực chất đã là thành viên hoặc chủ nhóm từ trước rồi.
-    USER_ALREADY_IN_GROUP(1113, "You are already a member of this group", HttpStatus.BAD_REQUEST),
+    USER_ALREADY_IN_GROUP(1218, "You are already a member of this group", HttpStatus.BAD_REQUEST),
 
     // Dùng khi nhóm đang để chế độ riêng tư, không cho phép tự do tham gia qua mã code công khai.
-    GROUP_IS_PRIVATE(1114, "This group is private and requires an invitation to join", HttpStatus.FORBIDDEN),
+    GROUP_IS_PRIVATE(1219, "This group is private and requires an invitation to join", HttpStatus.FORBIDDEN),
+
+    GROUP_DOCUMENT_UPLOAD_NOT_ALLOWED(1220, "Member is not allowed to upload documents in this group", HttpStatus.FORBIDDEN),
 
     // Dùng khi request body bị thiếu hoặc không đọc được JSON.
     REQUEST_BODY_INVALID(1201, "Request body is invalid", HttpStatus.BAD_REQUEST),

@@ -12,6 +12,8 @@ import lombok.experimental.FieldDefaults;
 public class DocumentResponse {
     String documentId;
 
+    String title;
+
     String fileName;
 
     String fileExtension;
@@ -30,6 +32,13 @@ public class DocumentResponse {
 
     String status;
 
+    String ownerId;
+
+    String ownerFullname;
+
+    String groupId;
+
+    String groupName;
     String uploadedAt;
 
     String timeSinceUpload;

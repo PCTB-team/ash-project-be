@@ -88,7 +88,7 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -130,7 +130,7 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -162,7 +162,7 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -192,7 +192,7 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -224,7 +224,7 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
