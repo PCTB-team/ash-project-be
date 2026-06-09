@@ -60,4 +60,17 @@ public class GroupFile {
 
     @Column(nullable = false)
     LocalDateTime uploadedAt;
+
+    /**
+     * false: file dang active trong group, true: file da duoc dua vao trash.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    Boolean deleted = false;
+
+    /**
+     * Thoi diem file bi dua vao trash, null neu file dang active.
+     */
+    @Column(name = "deleted_at")
+    LocalDateTime deletedAt;
 }

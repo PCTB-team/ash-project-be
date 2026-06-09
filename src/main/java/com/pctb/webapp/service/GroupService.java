@@ -6,6 +6,7 @@ import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
+import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
 import com.pctb.webapp.entity.JoinStatus;
@@ -13,6 +14,7 @@ import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.repository.GroupFileRepo;
 import com.pctb.webapp.repository.GroupMemberRepo;
 import com.pctb.webapp.repository.StudyGroupRepo;
 import com.pctb.webapp.repository.UserRepo;
@@ -38,6 +40,8 @@ public class GroupService {
     StudyGroupRepo studyGroupRepo;
 
     GroupMemberRepo groupMemberRepo;
+
+    GroupFileRepo groupFileRepo;
 
     UserRepo userRepo;
 
@@ -244,6 +248,35 @@ public class GroupService {
     }
 
     /**
+     * Leader kick member khoi group.
+     * Khong xoa record, chi chuyen status sang LEFT va tat quyen upload.
+     */
+    @Transactional
+    public GroupMemberResponse kickMember(
+            String groupId,
+            String memberId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeader(groupId, currentUser);
+
+        GroupMember member = getMemberInGroup(groupId, memberId);
+        if (member.getRole() == GroupRole.LEADER) {
+            throw new AppException(ErrorCode.GROUP_LEADER_CANNOT_BE_KICKED);
+        }
+
+        if (member.getJoinStatus() != JoinStatus.APPROVED) {
+            throw new AppException(ErrorCode.GROUP_MEMBER_NOT_APPROVED_TO_KICK);
+        }
+
+        member.setJoinStatus(JoinStatus.LEFT);
+        member.setCanUpload(false);
+        member.setJoinedAt(null);
+
+        return buildGroupMemberResponse(groupMemberRepo.save(member));
+    }
+
+    /**
      * Leader tao inviteToken moi khi link cu bi lo.
      * Token cu se mat tac dung vi da bi replace trong database.
      */
@@ -262,6 +295,28 @@ public class GroupService {
         group.setUpdatedAt(LocalDateTime.now());
 
         return buildCreateGroupResponse(studyGroupRepo.save(group));
+    }
+
+    /**
+     * Lay thong ke group tu database tai thoi diem request.
+     * Khong luu counter vao group de tranh sai so khi upload/delete/restore.
+     */
+    @Transactional
+    public GroupStatisticsResponse getStatistics(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        GroupMember member = requireApprovedMember(groupId, currentUser);
+        StudyGroup group = member.getGroup();
+
+        return GroupStatisticsResponse.builder()
+                .groupId(group.getId())
+                .groupName(group.getName())
+                .totalApprovedMembers(groupMemberRepo.countByGroupIdAndJoinStatus(group.getId(), JoinStatus.APPROVED))
+                .totalActiveDocuments(groupFileRepo.countByGroupIdAndDeletedFalse(group.getId()))
+                .totalTrashDocuments(groupFileRepo.countByGroupIdAndDeletedTrue(group.getId()))
+                .build();
     }
 
     /**
@@ -350,6 +405,36 @@ public class GroupService {
 
         if (member.getRole() != GroupRole.LEADER || member.getJoinStatus() != JoinStatus.APPROVED) {
             throw new AppException(ErrorCode.GROUP_ACCESS_DENIED);
+        }
+
+        return member;
+    }
+
+    /**
+     * Bat buoc current user phai la APPROVED member cua group.
+     * Dung cho cac man hinh group member duoc xem nhu statistics.
+     */
+    private GroupMember requireApprovedMember(String groupId, User currentUser) {
+        String normalizedGroupId = normalizeRequiredText(groupId);
+        GroupMember member = groupMemberRepo.findByGroupIdAndUserId(normalizedGroupId, currentUser.getId())
+                .orElse(null);
+
+        if (member == null) {
+            StudyGroup group = getGroupById(normalizedGroupId);
+            if (group.getOwner().getId().equals(currentUser.getId())) {
+                return createOwnerLeaderMembership(group, currentUser);
+            }
+
+            throw new AppException(ErrorCode.GROUP_ACCESS_DENIED);
+        }
+
+        if (member.getGroup().getOwner().getId().equals(currentUser.getId())
+                && (member.getRole() != GroupRole.LEADER || member.getJoinStatus() != JoinStatus.APPROVED)) {
+            return syncOwnerLeaderMembership(member);
+        }
+
+        if (member.getJoinStatus() != JoinStatus.APPROVED) {
+            throw new AppException(ErrorCode.GROUP_MEMBER_NOT_APPROVED);
         }
 
         return member;
