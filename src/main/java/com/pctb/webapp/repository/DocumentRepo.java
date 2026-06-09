@@ -33,6 +33,33 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
     @Query("select d from Document d where d.owner.id = :ownerId and (d.deleted = false or d.deleted is null) order by d.createdAt desc")
     List<Document> findActiveByOwnerId(@Param("ownerId") String ownerId);
 
+    @Query("""
+            select d from Document d
+            where d.owner.id = :ownerId
+              and (:folderId is null or d.folder.id = :folderId)
+              and lower(d.fileExtension) in :extensions
+              and (d.deleted = false or d.deleted is null)
+            order by d.createdAt desc
+            """)
+    List<Document> findActiveByOwnerIdAndFolderIdAndFileExtensions(
+            @Param("ownerId") String ownerId,
+            @Param("folderId") String folderId,
+            @Param("extensions") List<String> extensions
+    );
+
+    @Query("""
+            select count(d) from Document d
+            where d.owner.id = :ownerId
+              and (:folderId is null or d.folder.id = :folderId)
+              and lower(d.fileExtension) in :extensions
+              and (d.deleted = false or d.deleted is null)
+            """)
+    long countActiveByOwnerIdAndFolderIdAndFileExtensions(
+            @Param("ownerId") String ownerId,
+            @Param("folderId") String folderId,
+            @Param("extensions") List<String> extensions
+    );
+
     @Query(
             value = "select d from Document d where d.owner.id = :ownerId and (d.deleted = false or d.deleted is null) order by d.createdAt desc",
             countQuery = "select count(d) from Document d where d.owner.id = :ownerId and (d.deleted = false or d.deleted is null)"
