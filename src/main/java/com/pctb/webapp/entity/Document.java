@@ -53,6 +53,7 @@ public class Document {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id")
     StudyGroup group;
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "folder_id")
     Folder folder;
 
