@@ -37,7 +37,7 @@ public class DocumentService {
 
     FolderRepo folderRepo;
 
-    StorageService storageService;
+    CloudinaryStorageService storageService;
 
     FileValidationService fileValidationService;
 

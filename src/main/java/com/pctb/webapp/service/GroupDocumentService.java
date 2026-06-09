@@ -39,7 +39,7 @@ public class GroupDocumentService {
     GroupMemberRepo memberRepo;
     UserRepo userRepo;
     FileValidationService fileValidationService;
-    StorageService storageService;
+    CloudinaryStorageService storageService;
 
     @Value("${app.upload.max-user-storage}")
     @NonFinal

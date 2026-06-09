@@ -37,7 +37,7 @@ public class DocumentUploadService {
 
     FileValidationService fileValidationService;
 
-    StorageService storageService;
+    CloudinaryStorageService storageService;
 
     @Value("${app.upload.max-user-storage}")
     @NonFinal
