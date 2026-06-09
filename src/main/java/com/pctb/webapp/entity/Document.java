@@ -45,6 +45,10 @@ public class Document {
     @JoinColumn(name = "user_id", nullable = false)
     User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    StudyGroup group;
+
     @Column(nullable = false)
     LocalDateTime createdAt;
 

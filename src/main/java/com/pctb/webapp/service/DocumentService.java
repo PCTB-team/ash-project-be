@@ -82,7 +82,7 @@ public class DocumentService {
 
         // Kiem tra document co thuoc user dang dang nhap khong
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -149,7 +149,7 @@ public class DocumentService {
 
         // Kiem tra document co thuoc user dang dang nhap khong
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -191,7 +191,7 @@ public class DocumentService {
 
         // Kiem tra document co thuoc user dang dang nhap khong
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -230,7 +230,7 @@ public class DocumentService {
 
         // Kiem tra document co thuoc user dang dang nhap khong
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 
@@ -268,7 +268,7 @@ public class DocumentService {
 
         // Kiem tra document co thuoc user dang dang nhap khong
         String documentOwnerId = document.getOwner().getId();
-        if (!owner.getId().equals(documentOwnerId)) {
+        if (!owner.getId().equals(documentOwnerId) || document.getGroup() != null) {
             throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
         }
 

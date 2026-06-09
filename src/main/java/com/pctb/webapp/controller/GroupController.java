@@ -2,7 +2,9 @@ package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.GroupCreationRequest;
 import com.pctb.webapp.dto.request.GroupJoinRequest;
+import com.pctb.webapp.dto.request.UpdateMemberUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
+import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupResponse;
 import com.pctb.webapp.service.GroupService;
 import jakarta.validation.Valid;
@@ -10,6 +12,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/groups")
@@ -42,6 +46,37 @@ public class GroupController {
         groupService.joinPublicGroupDirectly(groupId);
         return ApiResponse.<String>builder()
                 .result("Joined public group successfully")
+                .build();
+    }
+
+    // Leader xem member va quyen upload.
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<List<GroupMemberResponse>> getGroupMembers(@PathVariable String groupId) {
+        return ApiResponse.<List<GroupMemberResponse>>builder()
+                .result(groupService.getGroupMembers(groupId))
+                .build();
+    }
+
+    // Leader bat/tat quyen upload cua member.
+    @PutMapping("/{groupId}/members/{memberId}/upload-permission")
+    public ApiResponse<GroupMemberResponse> updateMemberUploadPermission(
+            @PathVariable String groupId,
+            @PathVariable String memberId,
+            @RequestBody @Valid UpdateMemberUploadPermissionRequest request
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .result(groupService.updateMemberUploadPermission(groupId, memberId, request))
+                .build();
+    }
+    // Leader kick member khoi group.
+    @DeleteMapping("/{groupId}/members/{memberId}")
+    public ApiResponse<GroupMemberResponse> kickMember(
+            @PathVariable String groupId,
+            @PathVariable String memberId
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .message("Kick member successfully")
+                .result(groupService.kickMember(groupId, memberId))
                 .build();
     }
 }

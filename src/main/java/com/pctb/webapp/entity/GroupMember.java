@@ -32,11 +32,20 @@ public class GroupMember {
     @Column(nullable = false, length = 20)
     GroupRole role; // OWNER, MEMBER, ADMIN...
 
+    @Builder.Default
+    @Column(name = "can_upload_document", nullable = false)
+    Boolean canUploadDocument = false;
+
     @Column(nullable = false)
     LocalDateTime joinedAt;
 
     @PrePersist
     void onJoin() {
-        joinedAt = LocalDateTime.now();
+        if (joinedAt == null) {
+            joinedAt = LocalDateTime.now();
+        }
+        if (canUploadDocument == null) {
+            canUploadDocument = false;
+        }
     }
 }
