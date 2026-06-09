@@ -24,6 +24,12 @@ public class DocumentResponse {
 
     String storageUrl;
 
+    String folderId;
+
+    String viewUrl;
+
+    String downloadUrl;
+
     String status;
 
     String ownerId;
@@ -33,6 +39,9 @@ public class DocumentResponse {
     String groupId;
 
     String groupName;
+    String uploadedAt;
+
+    String timeSinceUpload;
 
     Boolean deleted;
 

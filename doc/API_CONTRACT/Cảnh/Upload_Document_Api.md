@@ -48,7 +48,9 @@ Authorization: Bearer <JWT_ACCESS_TOKEN>
     "mimeType": "application/pdf",
     "fileSize": 1048576,
     "storageUrl": "https://cloud-storage/documents/java-basic.pdf",
-    "status": "COMPLETED"
+    "status": "COMPLETED",
+    "uploadedAt": "2026-06-06T10:30:00",
+    "timeSinceUpload": "vừa xong"
   }
 }
 ```

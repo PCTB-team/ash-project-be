@@ -1,4 +1,5 @@
 package com.pctb.webapp.dto.response;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -21,5 +22,15 @@ public class DocumentUploadResponse {
 
     String storageUrl;
 
+    String folderId;
+
+    String viewUrl;
+
+    String downloadUrl;
+
     String status;
+
+    String uploadedAt;
+
+    String timeSinceUpload;
 }

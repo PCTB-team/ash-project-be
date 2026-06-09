@@ -225,7 +225,17 @@ public enum ErrorCode {
 
     AVATAR_UPLOAD_FAILED(1211, "Avatar upload failed", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    PROFILE_SCHOOL_INVALID(1212, "School is invalid", HttpStatus.BAD_REQUEST);
+    PROFILE_SCHOOL_INVALID(1212, "School is invalid", HttpStatus.BAD_REQUEST),
+
+    FOLDER_NAME_REQUIRED(1318, "Folder name is required", HttpStatus.BAD_REQUEST),
+
+    FOLDER_NAME_INVALID(1319, "Folder name is invalid", HttpStatus.BAD_REQUEST),
+
+    FOLDER_ALREADY_EXISTS(1320, "Folder already exists", HttpStatus.CONFLICT),
+
+    FOLDER_NOT_FOUND(1321, "Folder not found", HttpStatus.NOT_FOUND),
+
+    FOLDER_ACCESS_DENIED(1322, "Folder access denied", HttpStatus.FORBIDDEN);
 
     private final int code;
 
