@@ -36,9 +36,6 @@ public class DocumentResponse {
 
     String ownerFullname;
 
-    String groupId;
-
-    String groupName;
     String uploadedAt;
 
     String timeSinceUpload;

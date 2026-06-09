@@ -1,7 +1,10 @@
-package com.pctb.webapp.entity; // Hoặc package com.pctb.webapp.entity;
+package com.pctb.webapp.entity;
 
+/**
+ * Vai tro cua user trong group.
+ * LEADER co quyen quan ly group, MEMBER la thanh vien binh thuong.
+ */
 public enum GroupRole {
-    OWNER,   // Chủ sở hữu / Người tạo group (Có toàn quyền, xóa group)
-    ADMIN,   // Quản trị viên (Có thể duyệt thành viên, kích người)
-    MEMBER   // Thành viên bình thường (Chỉ xem và thảo luận)
+    LEADER,
+    MEMBER
 }

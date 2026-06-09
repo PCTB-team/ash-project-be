@@ -1,17 +1,35 @@
 package com.pctb.webapp.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+
 import java.time.LocalDateTime;
 
+/**
+ * Luu thong tin chinh cua private group.
+ * groupId chi dung noi bo, inviteToken moi dung de share link moi.
+ */
 @Entity
-@Table(name = "study_group")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "study_group")
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class StudyGroup {
     @Id
@@ -21,36 +39,37 @@ public class StudyGroup {
     @Column(nullable = false, length = 100)
     String name;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     String description;
+
+    @Column(nullable = false)
+    String passwordHash;
+
+    @Column(unique = true, nullable = false)
+    String inviteToken;
+
+    // Legacy column kept so existing MySQL tables with join_code NOT NULL can still insert.
+    @Column(name = "join_code", unique = true, nullable = false, length = 20)
+    String joinCode;
+
+    // Legacy column from the old group flow. New logic always creates private groups.
+    @Column(nullable = false, length = 20)
+    String visibility;
+
+    // Legacy password column from the old schema. Keep it synced with passwordHash.
+    @Column(length = 255)
+    String password;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     User owner;
 
-    @Column(nullable = false, unique = true, length = 20)
-    String joinCode;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    GroupVisibility visibility;
-
-    // === THÊM CỘT NÀY ĐỂ LƯU MẬT KHẨU NHÓM PRIVATE ===
-    @Column(length = 255)
-    String password;
+    @Builder.Default
+    @Column(nullable = false)
+    Boolean inviteEnabled = true;
 
     @Column(nullable = false)
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
-
-    @PrePersist
-    void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }

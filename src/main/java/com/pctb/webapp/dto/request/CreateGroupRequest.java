@@ -1,6 +1,5 @@
 package com.pctb.webapp.dto.request;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +14,10 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class UpdateMemberUploadPermissionRequest {
-    @NotNull(message = "REQUEST_BODY_INVALID")
-    Boolean canUploadDocument;
+public class CreateGroupRequest {
+    String name;
+
+    String description;
+
+    String password;
 }

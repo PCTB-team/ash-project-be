@@ -1,18 +1,26 @@
 package com.pctb.webapp.controller;
 
-import com.pctb.webapp.dto.request.GroupCreationRequest;
-import com.pctb.webapp.dto.request.GroupJoinRequest;
-import com.pctb.webapp.dto.request.UpdateMemberUploadPermissionRequest;
+import com.pctb.webapp.dto.request.CreateGroupRequest;
+import com.pctb.webapp.dto.request.JoinGroupRequest;
+import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
+import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
-import com.pctb.webapp.dto.response.GroupResponse;
+import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.List;
 
 @RestController
@@ -22,61 +30,123 @@ import java.util.List;
 public class GroupController {
     GroupService groupService;
 
-    // API Tạo nhóm học tập mới
-    @PostMapping("/create")
-    public ApiResponse<GroupResponse> createGroup(@RequestBody @Valid GroupCreationRequest request) {
-        return ApiResponse.<GroupResponse>builder()
-                .result(groupService.createGroup(request))
+    /**
+     * Tao private group moi.
+     * Leader nhan ve groupId noi bo va inviteLink de share cho user khac.
+     */
+    @PostMapping
+    public ApiResponse<CreateGroupResponse> createGroup(
+            @RequestBody @Valid CreateGroupRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<CreateGroupResponse>builder()
+                .message("Create group successfully")
+                .result(groupService.createGroup(request, authentication))
                 .build();
     }
 
-    // API Tham gia nhóm bằng mã code (Có check Password nếu là nhóm PRIVATE)
-    @PostMapping("/join")
-    public ApiResponse<String> joinGroup(@RequestBody @Valid GroupJoinRequest request) {
-        // ĐÃ SỬA THÀNH joinGroupByCode ĐỂ KHỚP 100% VỚI SERVICE CỦA BẠN
-        groupService.joinGroupByCode(request);
+    /**
+     * Xem preview group bang inviteToken.
+     * API nay khong tra passwordHash.
+     */
+    @GetMapping("/invite/{inviteToken}")
+    public ApiResponse<GroupPreviewResponse> getGroupPreview(@PathVariable String inviteToken) {
+        return ApiResponse.<GroupPreviewResponse>builder()
+                .message("Get group preview successfully")
+                .result(groupService.getGroupPreview(inviteToken))
+                .build();
+    }
+
+    /**
+     * User gui yeu cau join group bang inviteToken va password group.
+     * Neu hop le, request se o trang thai PENDING.
+     */
+    @PostMapping("/invite/{inviteToken}/join")
+    public ApiResponse<String> joinByInvite(
+            @PathVariable String inviteToken,
+            @RequestBody @Valid JoinGroupRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        groupService.joinByInvite(inviteToken, request, authentication);
+
         return ApiResponse.<String>builder()
-                .result("Joined group successfully")
+                .message("Join request sent successfully")
+                .result("PENDING")
                 .build();
     }
 
-    // API Tham gia trực tiếp không cần code từ danh sách nhóm công khai (Chỉ dành cho PUBLIC)
-    @PostMapping("/{groupId}/join-direct")
-    public ApiResponse<String> joinPublicGroupDirectly(@PathVariable String groupId) {
-        groupService.joinPublicGroupDirectly(groupId);
-        return ApiResponse.<String>builder()
-                .result("Joined public group successfully")
-                .build();
-    }
-
-    // Leader xem member va quyen upload.
-    @GetMapping("/{groupId}/members")
-    public ApiResponse<List<GroupMemberResponse>> getGroupMembers(@PathVariable String groupId) {
+    /**
+     * Leader xem danh sach member dang cho duyet.
+     */
+    @GetMapping("/{groupId}/pending-members")
+    public ApiResponse<List<GroupMemberResponse>> getPendingMembers(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
         return ApiResponse.<List<GroupMemberResponse>>builder()
-                .result(groupService.getGroupMembers(groupId))
+                .message("Get pending members successfully")
+                .result(groupService.getPendingMembers(groupId, authentication))
                 .build();
     }
 
-    // Leader bat/tat quyen upload cua member.
-    @PutMapping("/{groupId}/members/{memberId}/upload-permission")
-    public ApiResponse<GroupMemberResponse> updateMemberUploadPermission(
+    /**
+     * Leader duyet member vao group.
+     * Sau khi approve, member van can leader bat canUpload de upload file.
+     */
+    @PutMapping("/{groupId}/members/{memberId}/approve")
+    public ApiResponse<GroupMemberResponse> approveMember(
             @PathVariable String groupId,
             @PathVariable String memberId,
-            @RequestBody @Valid UpdateMemberUploadPermissionRequest request
+            JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<GroupMemberResponse>builder()
-                .result(groupService.updateMemberUploadPermission(groupId, memberId, request))
+                .message("Approve member successfully")
+                .result(groupService.approveMember(groupId, memberId, authentication))
                 .build();
     }
-    // Leader kick member khoi group.
-    @DeleteMapping("/{groupId}/members/{memberId}")
-    public ApiResponse<GroupMemberResponse> kickMember(
+
+    /**
+     * Leader tu choi request join cua member.
+     */
+    @PutMapping("/{groupId}/members/{memberId}/reject")
+    public ApiResponse<GroupMemberResponse> rejectMember(
             @PathVariable String groupId,
-            @PathVariable String memberId
+            @PathVariable String memberId,
+            JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<GroupMemberResponse>builder()
-                .message("Kick member successfully")
-                .result(groupService.kickMember(groupId, memberId))
+                .message("Reject member successfully")
+                .result(groupService.rejectMember(groupId, memberId, authentication))
+                .build();
+    }
+
+    /**
+     * Leader bat hoac tat quyen upload file cua member da APPROVED.
+     */
+    @PutMapping("/{groupId}/members/{memberId}/upload-permission")
+    public ApiResponse<GroupMemberResponse> updateUploadPermission(
+            @PathVariable String groupId,
+            @PathVariable String memberId,
+            @RequestBody @Valid UpdateUploadPermissionRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .message("Update upload permission successfully")
+                .result(groupService.updateUploadPermission(groupId, memberId, request, authentication))
+                .build();
+    }
+
+    /**
+     * Leader tao inviteToken moi khi link cu bi lo.
+     */
+    @PutMapping("/{groupId}/regenerate-invite-token")
+    public ApiResponse<CreateGroupResponse> regenerateInviteToken(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<CreateGroupResponse>builder()
+                .message("Regenerate invite token successfully")
+                .result(groupService.regenerateInviteToken(groupId, authentication))
                 .build();
     }
 }

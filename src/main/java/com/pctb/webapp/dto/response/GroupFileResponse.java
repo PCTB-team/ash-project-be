@@ -14,18 +14,18 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMemberResponse {
-    String memberId;
+public class GroupFileResponse {
+    String fileId;
 
-    String userId;
+    String fileName;
 
-    String fullname;
+    String mimeType;
 
-    String email;
+    Long fileSize;
 
-    String role;
+    String storageUrl;
 
-    String joinStatus;
+    String uploadedBy;
 
-    Boolean canUpload;
+    String uploadedAt;
 }
