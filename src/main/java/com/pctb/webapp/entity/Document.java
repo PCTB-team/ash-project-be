@@ -1,4 +1,5 @@
 package com.pctb.webapp.entity;
+
 import com.pctb.webapp.exception.UploadStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -12,7 +13,11 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "document")
+@Table(name = "document", indexes = {
+        @Index(name = "idx_document_owner_deleted_created", columnList = "user_id, deleted, created_at"),
+        @Index(name = "idx_document_owner_file_name", columnList = "user_id, file_name"),
+        @Index(name = "idx_document_owner_folder_deleted_created", columnList = "user_id, folder_id, deleted, created_at")
+})
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Document {
     @Id
@@ -44,6 +49,10 @@ public class Document {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "folder_id")
+    Folder folder;
 
     @Column(nullable = false)
     LocalDateTime createdAt;

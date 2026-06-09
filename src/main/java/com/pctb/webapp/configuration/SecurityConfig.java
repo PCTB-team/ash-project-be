@@ -66,6 +66,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .requestMatchers("/documents/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/folders/**").hasAnyRole("USER", "ADMIN")
                         // Profile chỉ yêu cầu đăng nhập, khác với GET /user cần ADMIN.
                         .requestMatchers(HttpMethod.GET, "/user/profile").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/user/profile").authenticated()

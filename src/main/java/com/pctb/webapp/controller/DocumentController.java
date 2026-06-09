@@ -5,12 +5,13 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
-import jakarta.validation.Valid;
 import com.pctb.webapp.service.DocumentService;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -38,6 +40,19 @@ public class DocumentController {
         return ApiResponse.<List<DocumentResponse>>builder()
                 .message("Get documents successfully")
                 .result(documentService.getMyDocuments(authentication))
+                .build();
+    }
+
+    @GetMapping("/page")
+    public ApiResponse<Page<DocumentResponse>> getMyDocumentsPage(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "folderId", required = false) String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<Page<DocumentResponse>>builder()
+                .message("Get documents successfully")
+                .result(documentService.getMyDocumentsPage(authentication, page, size, folderId))
                 .build();
     }
 

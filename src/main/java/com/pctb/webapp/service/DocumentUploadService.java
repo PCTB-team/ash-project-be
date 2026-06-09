@@ -2,12 +2,13 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.response.DocumentUploadResponse;
 import com.pctb.webapp.entity.Document;
-
+import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.exception.UploadStatus;
 import com.pctb.webapp.repository.DocumentRepo;
+import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +33,8 @@ public class DocumentUploadService {
 
     UserRepo userRepo;
 
+    FolderRepo folderRepo;
+
     FileValidationService fileValidationService;
 
     StorageService storageService;
@@ -39,47 +43,43 @@ public class DocumentUploadService {
     @NonFinal
     long maxUserStorage;
 
-    // Upload document
+    @Transactional
     public DocumentUploadResponse upload(
-            MultipartFile file,  // Đại diện cho file
-            Boolean replaceExisting, // Có cho phép thay thế file đã tồn tại hay không
-            JwtAuthenticationToken authentication // token authen
+            MultipartFile file,
+            Boolean replaceExisting,
+            String folderId,
+            JwtAuthenticationToken authentication
     ) {
-        // Lấy user id
         String userId = authentication.getName();
-        //
         User owner = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        Folder folder = resolveFolder(normalizedFolderId, userId);
 
-        // Kiểm tra mimeType thật của file
         String realMimeType = fileValidationService.validate(file);
-        // Lấy tên gốc của file
         String originalFileName = cleanOriginalFileName(file.getOriginalFilename());
-        // Lấy extension từ tên file gốc
         String extension = fileValidationService.getExtension(originalFileName);
-        // Physical storage path uses UUID to avoid filename conflicts.
         String storedFileName = buildStoredFileName(owner.getId(), extension);
 
-        boolean shouldReplace = Boolean.TRUE.equals(replaceExisting); // Kiểm tra có cho phép thay đổi không
-
-        // Tìm document đã tồn tại chưa
-        Document existingDocument = documentRepo.findByOwnerAndFileName(owner, originalFileName)
+        boolean shouldReplace = Boolean.TRUE.equals(replaceExisting);
+        Document existingDocument = documentRepo.findByOwnerIdAndFolderIdAndFileName(owner.getId(), normalizedFolderId, originalFileName)
                 .orElse(null);
-        // Nếu đã tồn tại và không cho phép thay đổi thì báo lỗi
+
         if (existingDocument != null && !shouldReplace) {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
 
         validateStorageCapacity(owner, existingDocument, file.getSize());
 
-        // Nếu đã tồn tại và cho phép thay đổi thì xóa file cũ trong storage và DB
         if (existingDocument != null) {
             storageService.delete(existingDocument.getStorageUrl());
+            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
+                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
+            }
             documentRepo.delete(existingDocument);
         }
-        // Lấy url lưu trữ
-        String storageUrl = storageService.upload(file, storedFileName);
 
+        String storageUrl = storageService.upload(file, storedFileName);
         LocalDateTime now = LocalDateTime.now();
 
         Document document = Document.builder()
@@ -91,12 +91,14 @@ public class DocumentUploadService {
                 .storageUrl(storageUrl)
                 .status(UploadStatus.COMPLETED)
                 .owner(owner)
+                .folder(folder)
                 .createdAt(now)
                 .updatedAt(now)
                 .deleted(false)
                 .build();
 
         document = documentRepo.save(document);
+        updateFolderSizeCascade(folder, file.getSize());
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())
@@ -105,6 +107,7 @@ public class DocumentUploadService {
                 .mimeType(document.getMimeType())
                 .fileSize(document.getFileSize())
                 .storageUrl(document.getStorageUrl())
+                .folderId(document.getFolder() == null ? null : document.getFolder().getId())
                 .viewUrl(buildDocumentViewUrl(document.getId()))
                 .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
@@ -112,7 +115,40 @@ public class DocumentUploadService {
                 .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .build();
     }
-    // Lấy tên gốc của file, ví dụ name.pdf thay vì nguyên path
+
+    private Folder resolveFolder(String folderId, String userId) {
+        if (folderId == null) {
+            return null;
+        }
+
+        return folderRepo.findActiveByIdAndOwnerId(folderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
+    }
+
+    private void updateFolderSizeCascade(Folder folder, long delta) {
+        Folder current = folder;
+
+        while (current != null) {
+            long currentSize = current.getSize() == null ? 0 : current.getSize();
+            current.setSize(Math.max(0, currentSize + delta));
+            current.setUpdatedAt(LocalDateTime.now());
+            folderRepo.save(current);
+            current = current.getParent();
+        }
+    }
+
+    private long safeFileSize(Document document) {
+        return document.getFileSize() == null ? 0 : document.getFileSize();
+    }
+
+    private String normalizeOptionalId(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+
+        return id.trim();
+    }
+
     private String buildDocumentViewUrl(String documentId) {
         return "/documents/" + documentId + "/view";
     }

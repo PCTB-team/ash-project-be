@@ -22,6 +22,8 @@ public class DocumentResponse {
 
     String storageUrl;
 
+    String folderId;
+
     String viewUrl;
 
     String downloadUrl;
