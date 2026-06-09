@@ -27,7 +27,7 @@ public class UserService {
     DocumentRepo documentRepo;
     UserLoginHistoryRepo userLoginHistoryRepo;
     UserMapper userMapper;
-    LocalStorageService localStorageService;
+    CloudinaryStorageService CloudinaryStorageService;
     PasswordEncoder passwordEncoder;
     // Lấy toàn bộ User
     public List<UserResponse> getUser(){
@@ -53,7 +53,7 @@ public class UserService {
         validateFullname(request.getFullname());
 
         String oldAvatarUrl = user.getAvatarUrl();
-        String newAvatarUrl = localStorageService.saveAvatar(userId, request.getAvatar());
+        String newAvatarUrl = CloudinaryStorageService.saveAvatar(userId, request.getAvatar());
 
         user.setFullname(request.getFullname().trim());
         user.setSchool(normalizeOptionalText(request.getSchool()));
@@ -68,12 +68,12 @@ public class UserService {
             User savedUser = userRepo.save(user);
 
             if (newAvatarUrl != null) {
-                localStorageService.deleteAvatar(oldAvatarUrl);
+                CloudinaryStorageService.deleteAvatar(oldAvatarUrl);
             }
 
             return buildUserProfileResponse(savedUser);
         } catch (RuntimeException exception) {
-            localStorageService.deleteAvatar(newAvatarUrl);
+            CloudinaryStorageService.deleteAvatar(newAvatarUrl);
             throw exception;
         }
     }
