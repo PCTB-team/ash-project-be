@@ -5,6 +5,7 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
+import com.pctb.webapp.dto.response.FilteredDocumentResponse;
 import com.pctb.webapp.service.DocumentService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -53,6 +54,18 @@ public class DocumentController {
         return ApiResponse.<Page<DocumentResponse>>builder()
                 .message("Get documents successfully")
                 .result(documentService.getMyDocumentsPage(authentication, page, size, folderId))
+                .build();
+    }
+
+    @GetMapping("/filter")
+    public ApiResponse<FilteredDocumentResponse> filterMyDocumentsByFileType(
+            @RequestParam("fileType") String fileType,
+            @RequestParam(value = "folderId", required = false) String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<FilteredDocumentResponse>builder()
+                .message("Filter documents successfully")
+                .result(documentService.filterMyDocumentsByFileType(authentication, fileType, folderId))
                 .build();
     }
 

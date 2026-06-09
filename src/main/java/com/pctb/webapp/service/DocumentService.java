@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.request.UpdateDocumentRequest;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
+import com.pctb.webapp.dto.response.FilteredDocumentResponse;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.entity.User;
@@ -26,6 +27,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +77,37 @@ public class DocumentService {
                         PageRequest.of(normalizedPage, normalizedSize)
                 )
                 .map(this::buildDocumentResponse);
+    }
+
+    public FilteredDocumentResponse filterMyDocumentsByFileType(
+            JwtAuthenticationToken authentication,
+            String fileType,
+            String folderId
+    ) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+
+        if (normalizedFolderId != null) {
+            resolveFolder(normalizedFolderId, userId);
+        }
+
+        List<String> extensions = resolveFileTypeExtensions(fileType);
+        List<DocumentResponse> documents = documentRepo
+                .findActiveByOwnerIdAndFolderIdAndFileExtensions(userId, normalizedFolderId, extensions)
+                .stream()
+                .map(this::buildDocumentResponse)
+                .toList();
+        long total = documentRepo.countActiveByOwnerIdAndFolderIdAndFileExtensions(
+                userId,
+                normalizedFolderId,
+                extensions
+        );
+
+        return FilteredDocumentResponse.builder()
+                .fileType(normalizeFileType(fileType))
+                .total(total)
+                .documents(documents)
+                .build();
     }
 
     @Transactional
@@ -283,6 +316,39 @@ public class DocumentService {
         }
 
         return id.trim();
+    }
+
+    private List<String> resolveFileTypeExtensions(String fileType) {
+        String normalizedFileType = normalizeFileType(fileType);
+
+        return switch (normalizedFileType) {
+            case "word", "doc", "docx" -> List.of("doc", "docx");
+            case "pdf" -> List.of("pdf");
+            case "image", "photo", "picture", "png", "jpg", "jpeg" -> List.of("png", "jpg", "jpeg");
+            case "powerpoint", "presentation", "ppt", "pptx" -> List.of("ppt", "pptx");
+            case "excel", "spreadsheet", "xls", "xlsx" -> List.of("xls", "xlsx");
+            case "text", "txt" -> List.of("txt");
+            case "audio", "music", "mp3" -> List.of("mp3");
+            case "video", "mp4" -> List.of("mp4");
+            default -> throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
+        };
+    }
+
+    private String normalizeFileType(String fileType) {
+        if (fileType == null || fileType.isBlank()) {
+            throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
+        }
+
+        String normalizedFileType = fileType.trim().toLowerCase(Locale.ROOT);
+        if (normalizedFileType.startsWith(".")) {
+            normalizedFileType = normalizedFileType.substring(1);
+        }
+
+        if (normalizedFileType.isBlank()) {
+            throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
+        }
+
+        return normalizedFileType;
     }
 
     private String cleanFileName(String fileName) {
