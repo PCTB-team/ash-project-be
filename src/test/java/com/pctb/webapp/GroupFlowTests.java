@@ -4,7 +4,9 @@ import com.pctb.webapp.dto.request.CreateGroupRequest;
 import com.pctb.webapp.dto.request.JoinGroupRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
+import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
+import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
 import com.pctb.webapp.entity.JoinStatus;
@@ -118,8 +120,78 @@ class GroupFlowTests {
                 "text/plain",
                 "hello group".getBytes()
         );
-        assertThat(groupFileService.uploadFile(groupId, uploadFile, memberAuth).getFileName())
-                .isEqualTo("note.txt");
+        GroupFileResponse firstDocument = groupFileService.uploadDocument(groupId, uploadFile, memberAuth);
+        assertThat(firstDocument.getFileName()).isEqualTo("note.txt");
+        assertThat(firstDocument.getDeleted()).isFalse();
+
+        MockMultipartFile secondUploadFile = new MockMultipartFile(
+                "file",
+                "summary.txt",
+                "text/plain",
+                "hello second group file".getBytes()
+        );
+        GroupFileResponse secondDocument = groupFileService.uploadDocument(groupId, secondUploadFile, memberAuth);
+        assertThat(secondDocument.getFileName()).isEqualTo("summary.txt");
+
+        assertThat(groupFileService.getActiveDocuments(groupId, memberAuth))
+                .extracting(GroupFileResponse::getFileId)
+                .containsExactlyInAnyOrder(firstDocument.getFileId(), secondDocument.getFileId());
+
+        GroupStatisticsResponse beforeTrashStatistics = groupService.getStatistics(groupId, memberAuth);
+        assertThat(beforeTrashStatistics.getTotalApprovedMembers()).isEqualTo(2);
+        assertThat(beforeTrashStatistics.getTotalActiveDocuments()).isEqualTo(2);
+        assertThat(beforeTrashStatistics.getTotalTrashDocuments()).isZero();
+
+        assertThatThrownBy(() -> groupFileService.moveDocumentToTrash(groupId, firstDocument.getFileId(), memberAuth))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.GROUP_ACCESS_DENIED);
+
+        groupFileService.moveDocumentToTrash(groupId, firstDocument.getFileId(), leaderAuth);
+        assertThat(groupFileService.getActiveDocuments(groupId, memberAuth))
+                .extracting(GroupFileResponse::getFileId)
+                .containsExactly(secondDocument.getFileId());
+        assertThat(groupFileService.getTrashDocuments(groupId, leaderAuth))
+                .extracting(GroupFileResponse::getFileId)
+                .containsExactly(firstDocument.getFileId());
+
+        GroupStatisticsResponse afterTrashStatistics = groupService.getStatistics(groupId, leaderAuth);
+        assertThat(afterTrashStatistics.getTotalApprovedMembers()).isEqualTo(2);
+        assertThat(afterTrashStatistics.getTotalActiveDocuments()).isEqualTo(1);
+        assertThat(afterTrashStatistics.getTotalTrashDocuments()).isEqualTo(1);
+
+        GroupFileResponse restoredDocument = groupFileService.restoreDocument(groupId, firstDocument.getFileId(), leaderAuth);
+        assertThat(restoredDocument.getDeleted()).isFalse();
+        assertThat(restoredDocument.getDeletedAt()).isNull();
+
+        GroupStatisticsResponse afterRestoreStatistics = groupService.getStatistics(groupId, leaderAuth);
+        assertThat(afterRestoreStatistics.getTotalActiveDocuments()).isEqualTo(2);
+        assertThat(afterRestoreStatistics.getTotalTrashDocuments()).isZero();
+
+        GroupMemberResponse kickedMember = groupService.kickMember(groupId, memberId, leaderAuth);
+        assertThat(kickedMember.getJoinStatus()).isEqualTo(JoinStatus.LEFT.name());
+        assertThat(kickedMember.getCanUpload()).isFalse();
+
+        assertThatThrownBy(() -> groupFileService.getGroupFiles(groupId, memberAuth))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.GROUP_MEMBER_NOT_APPROVED);
+
+        assertThatThrownBy(() -> groupService.getStatistics(groupId, memberAuth))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.GROUP_MEMBER_NOT_APPROVED);
+
+        groupService.joinByInvite(
+                inviteToken,
+                JoinGroupRequest.builder().password("123123@").build(),
+                memberAuth
+        );
+
+        List<GroupMemberResponse> rejoinPendingMembers = groupService.getPendingMembers(groupId, leaderAuth);
+        assertThat(rejoinPendingMembers)
+                .extracting(GroupMemberResponse::getMemberId)
+                .contains(memberId);
     }
 
     private User saveUser(String email, String username) {

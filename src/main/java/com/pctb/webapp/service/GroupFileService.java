@@ -71,9 +71,22 @@ public class GroupFileService {
                 .group(group)
                 .uploadedBy(currentUser)
                 .uploadedAt(LocalDateTime.now())
+                .deleted(false)
                 .build();
 
         return buildGroupFileResponse(groupFileRepo.save(groupFile));
+    }
+
+    /**
+     * Alias cho API /documents de frontend goi dung ngon ngu tai lieu trong group.
+     */
+    @Transactional
+    public GroupFileResponse uploadDocument(
+            String groupId,
+            MultipartFile file,
+            JwtAuthenticationToken authentication
+    ) {
+        return uploadFile(groupId, file, authentication);
     }
 
     /**
@@ -88,10 +101,84 @@ public class GroupFileService {
         User currentUser = getCurrentUser(authentication);
         requireApprovedMember(groupId, currentUser);
 
-        return groupFileRepo.findByGroupIdOrderByUploadedAtDesc(groupId)
+        return groupFileRepo.findByGroupIdAndDeletedFalseOrderByUploadedAtDesc(groupId)
                 .stream()
                 .map(this::buildGroupFileResponse)
                 .toList();
+    }
+
+    /**
+     * Alias cho API /documents, chi tra file active chua bi dua vao trash.
+     */
+    @Transactional
+    public List<GroupFileResponse> getActiveDocuments(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return getGroupFiles(groupId, authentication);
+    }
+
+    /**
+     * Leader dua document vao trash.
+     * Khong xoa vat ly file/database de con restore lai duoc.
+     */
+    @Transactional
+    public void moveDocumentToTrash(
+            String groupId,
+            String documentId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeader(groupId, currentUser);
+
+        GroupFile groupFile = getFileInGroup(groupId, documentId);
+        if (Boolean.TRUE.equals(groupFile.getDeleted())) {
+            throw new AppException(ErrorCode.GROUP_FILE_ALREADY_DELETED);
+        }
+
+        groupFile.setDeleted(true);
+        groupFile.setDeletedAt(LocalDateTime.now());
+        groupFileRepo.save(groupFile);
+    }
+
+    /**
+     * Leader xem danh sach document dang nam trong trash cua group.
+     */
+    @Transactional
+    public List<GroupFileResponse> getTrashDocuments(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeader(groupId, currentUser);
+
+        return groupFileRepo.findByGroupIdAndDeletedTrueOrderByDeletedAtDesc(groupId)
+                .stream()
+                .map(this::buildGroupFileResponse)
+                .toList();
+    }
+
+    /**
+     * Leader restore document tu trash ve danh sach active.
+     */
+    @Transactional
+    public GroupFileResponse restoreDocument(
+            String groupId,
+            String documentId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeader(groupId, currentUser);
+
+        GroupFile groupFile = getFileInGroup(groupId, documentId);
+        if (!Boolean.TRUE.equals(groupFile.getDeleted())) {
+            throw new AppException(ErrorCode.GROUP_FILE_NOT_DELETED);
+        }
+
+        groupFile.setDeleted(false);
+        groupFile.setDeletedAt(null);
+
+        return buildGroupFileResponse(groupFileRepo.save(groupFile));
     }
 
     /**
@@ -144,6 +231,32 @@ public class GroupFileService {
         }
 
         return member;
+    }
+
+    /**
+     * Check current user la LEADER APPROVED trong group.
+     */
+    private GroupMember requireLeader(String groupId, User currentUser) {
+        GroupMember member = requireApprovedMember(groupId, currentUser);
+        if (member.getRole() != GroupRole.LEADER) {
+            throw new AppException(ErrorCode.GROUP_ACCESS_DENIED);
+        }
+
+        return member;
+    }
+
+    /**
+     * Tim file theo documentId va dam bao file thuoc dung group dang thao tac.
+     */
+    private GroupFile getFileInGroup(String groupId, String documentId) {
+        GroupFile groupFile = groupFileRepo.findById(normalizeRequiredText(documentId))
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_FILE_NOT_FOUND));
+
+        if (!groupFile.getGroup().getId().equals(normalizeRequiredText(groupId))) {
+            throw new AppException(ErrorCode.GROUP_FILE_NOT_IN_GROUP);
+        }
+
+        return groupFile;
     }
 
     /**
@@ -213,6 +326,8 @@ public class GroupFileService {
                 .storageUrl(groupFile.getStorageUrl())
                 .uploadedBy(groupFile.getUploadedBy().getFullname())
                 .uploadedAt(groupFile.getUploadedAt() == null ? null : groupFile.getUploadedAt().toString())
+                .deleted(Boolean.TRUE.equals(groupFile.getDeleted()))
+                .deletedAt(groupFile.getDeletedAt() == null ? null : groupFile.getDeletedAt().toString())
                 .build();
     }
 

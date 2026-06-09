@@ -7,6 +7,7 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
+import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -137,6 +138,22 @@ public class GroupController {
     }
 
     /**
+     * Leader kick member da APPROVED khoi group.
+     * Backend giu membership record va chuyen status sang LEFT.
+     */
+    @PutMapping("/{groupId}/members/{memberId}/kick")
+    public ApiResponse<GroupMemberResponse> kickMember(
+            @PathVariable String groupId,
+            @PathVariable String memberId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .message("Kick member successfully")
+                .result(groupService.kickMember(groupId, memberId, authentication))
+                .build();
+    }
+
+    /**
      * Leader tao inviteToken moi khi link cu bi lo.
      */
     @PutMapping("/{groupId}/regenerate-invite-token")
@@ -147,6 +164,20 @@ public class GroupController {
         return ApiResponse.<CreateGroupResponse>builder()
                 .message("Regenerate invite token successfully")
                 .result(groupService.regenerateInviteToken(groupId, authentication))
+                .build();
+    }
+
+    /**
+     * Member da APPROVED xem thong ke member/document/trash trong group.
+     */
+    @GetMapping("/{groupId}/statistics")
+    public ApiResponse<GroupStatisticsResponse> getStatistics(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupStatisticsResponse>builder()
+                .message("Get group statistics successfully")
+                .result(groupService.getStatistics(groupId, authentication))
                 .build();
     }
 }

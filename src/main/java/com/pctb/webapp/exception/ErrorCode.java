@@ -231,6 +231,18 @@ public enum ErrorCode {
 
     GROUP_INVITE_TOKEN_GENERATION_FAILED(1225, "Failed to generate group invite token", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    GROUP_LEADER_CANNOT_BE_KICKED(1226, "Group leader cannot be kicked", HttpStatus.BAD_REQUEST),
+
+    GROUP_MEMBER_NOT_APPROVED_TO_KICK(1227, "Only approved members can be kicked from group", HttpStatus.BAD_REQUEST),
+
+    GROUP_FILE_NOT_FOUND(1228, "Group file not found", HttpStatus.NOT_FOUND),
+
+    GROUP_FILE_ALREADY_DELETED(1229, "Group file is already deleted", HttpStatus.CONFLICT),
+
+    GROUP_FILE_NOT_DELETED(1230, "Group file is not in trash", HttpStatus.BAD_REQUEST),
+
+    GROUP_FILE_NOT_IN_GROUP(1231, "File does not belong to this group", HttpStatus.BAD_REQUEST),
+
     FOLDER_NAME_REQUIRED(1318, "Folder name is required", HttpStatus.BAD_REQUEST),
 
     FOLDER_NAME_INVALID(1319, "Folder name is invalid", HttpStatus.BAD_REQUEST),
