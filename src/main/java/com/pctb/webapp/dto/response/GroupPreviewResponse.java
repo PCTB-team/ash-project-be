@@ -14,18 +14,10 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMemberResponse {
-    String memberId;
+public class GroupPreviewResponse {
+    String groupName;
 
-    String userId;
+    String description;
 
-    String fullname;
-
-    String email;
-
-    String role;
-
-    String joinStatus;
-
-    Boolean canUpload;
+    String ownerName;
 }

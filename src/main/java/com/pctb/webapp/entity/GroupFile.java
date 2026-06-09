@@ -2,8 +2,6 @@ package com.pctb.webapp.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -11,7 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +20,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * Luu quan he user - group, kem trang thai duyet va quyen upload.
+ * Luu file duoc upload vao group, tach rieng khoi Document ca nhan.
  */
 @Entity
 @Getter
@@ -31,35 +28,36 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(
-        name = "group_member",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"group_id", "user_id"})
-)
+@Table(name = "group_file")
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMember {
+public class GroupFile {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     String id;
+
+    @Column(nullable = false)
+    String fileName;
+
+    @Column(nullable = false)
+    String fileExtension;
+
+    @Column(nullable = false)
+    String mimeType;
+
+    @Column(nullable = false)
+    Long fileSize;
+
+    @Column(nullable = false)
+    String storageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
     StudyGroup group;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    User user;
+    @JoinColumn(name = "uploaded_by", nullable = false)
+    User uploadedBy;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    GroupRole role;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    JoinStatus joinStatus;
-
-    @Builder.Default
-    @Column(nullable = false)
-    Boolean canUpload = false;
-
-    LocalDateTime joinedAt;
+    LocalDateTime uploadedAt;
 }
