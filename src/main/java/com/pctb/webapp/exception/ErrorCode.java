@@ -251,7 +251,21 @@ public enum ErrorCode {
 
     FOLDER_NOT_FOUND(1321, "Folder not found", HttpStatus.NOT_FOUND),
 
-    FOLDER_ACCESS_DENIED(1322, "Folder access denied", HttpStatus.FORBIDDEN);
+    FOLDER_ACCESS_DENIED(1322, "Folder access denied", HttpStatus.FORBIDDEN),
+
+    // ==================== ADMIN ADVANCED ERRORS (14xx) ====================
+
+    // Dùng khi Admin cố tình tự khóa tài khoản của chính mình
+    ADMIN_CANNOT_LOCK_SELF(1401, "Admin cannot lock their own account", HttpStatus.BAD_REQUEST),
+
+    // Dùng khi tài khoản đã bị khóa bởi hệ thống/Admin rồi nhưng vẫn cố tình đăng nhập
+    ACCOUNT_IS_LOCKED(1402, "This account has been locked. Please contact support for assistance", HttpStatus.FORBIDDEN),
+
+    // Dùng khi lý do khóa tài khoản gửi lên từ request bị trống
+    LOCK_REASON_REQUIRED(1403, "Lock reason is required", HttpStatus.BAD_REQUEST),
+
+    // Dùng khi tài khoản đang ở trạng thái bình thường nhưng Admin lại gọi API mở khóa
+    ACCOUNT_ALREADY_UNLOCKED(1404, "Account is already unlocked", HttpStatus.CONFLICT);
 
     private final int code;
 

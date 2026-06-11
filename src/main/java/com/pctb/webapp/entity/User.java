@@ -5,6 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
@@ -47,4 +48,18 @@ public class User {
 
     @Column(nullable = false)
     boolean verified = false; /// Dùng để theo dõi trạng thái xác thực của user.
+
+    // === PHẦN BỔ SUNG ADMIN BUSINESS RULES ===
+    @Column(nullable = false)
+    boolean accountNonLocked = true; // true: Bình thường, false: Bị khóa
+
+    @Column(name = "locked_at")
+    LocalDateTime lockedAt;
+
+    @Column(name = "locked_reason", length = 255)
+    String lockedReason;
+
+    @Column(name = "locked_by_admin")
+    String lockedByAdmin; // Lưu username hoặc ID của Admin thực hiện
+
 }
