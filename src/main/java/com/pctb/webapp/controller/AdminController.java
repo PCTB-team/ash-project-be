@@ -1,6 +1,8 @@
 package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.LockUserRequest;
+import com.pctb.webapp.dto.response.ApiResponse;
+import com.pctb.webapp.dto.response.DashboardStatsResponse;
 import com.pctb.webapp.dto.response.UserResponse;
 import com.pctb.webapp.entity.SystemLog;
 import com.pctb.webapp.service.AdminService;
@@ -66,5 +68,12 @@ public class AdminController {
     @GetMapping("/dashboard/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
         return ResponseEntity.ok(adminService.getSystemStats());
+    }
+
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<ApiResponse<DashboardStatsResponse>> getDashboardStats() {
+        return ResponseEntity.ok(ApiResponse.<DashboardStatsResponse>builder()
+                .result(adminService.getDashboardStats())
+                .build());
     }
 }

@@ -28,4 +28,6 @@ public interface UserRepo extends JpaRepository<User, String> {
             "LOWER(u.fullname) LIKE LOWER(CONCAT('%', :keyword, '%'))")     //tìm user bằng fullname
     Page<User> searchUsers(@Param("keyword") String keyword, Pageable pageable);
 
+    // Đếm user tạo sau một thời điểm nhất định
+    long countByCreatedAtAfter(LocalDateTime startDateTime);
 }
