@@ -1,6 +1,7 @@
 package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.LockUserRequest;
+import com.pctb.webapp.dto.response.DashboardStatsResponse;
 import com.pctb.webapp.dto.response.UserResponse;
 import com.pctb.webapp.entity.SystemLog;
 import com.pctb.webapp.entity.User;
@@ -119,5 +120,20 @@ public class AdminService {
         response.setLockedByAdmin(user.getLockedByAdmin());
 
         return response;
+    }
+
+    public DashboardStatsResponse getDashboardStats() {
+        LocalDateTime now = LocalDateTime.now();
+
+        // Tính toán mốc thời gian
+        Map<String, Long> growth = new HashMap<>();
+        growth.put("last7Days", userRepo.countByCreatedAtAfter(now.minusDays(7)));
+        growth.put("last2Weeks", userRepo.countByCreatedAtAfter(now.minusDays(14)));
+        growth.put("last1Month", userRepo.countByCreatedAtAfter(now.minusMonths(1)));
+
+        return DashboardStatsResponse.builder()
+                .totalUsers(userRepo.count())
+                .userGrowth(growth)
+                .build();
     }
 }
