@@ -4,6 +4,7 @@ import com.pctb.webapp.ai.dto.response.IndexStatusResponse;
 import com.pctb.webapp.ai.service.AiPermissionService;
 import com.pctb.webapp.ai.service.DocumentIngestionService;
 import com.pctb.webapp.dto.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,6 +32,7 @@ public class AiIngestionController {
      * Chay lai index cho document ca nhan.
      * Endpoint nay huu ich khi upload cu bi FAILED hoac can refresh chunks.
      */
+    @Operation(summary = "Reindex personal document for AI")
     @PostMapping("/documents/{documentId}/reindex")
     public ApiResponse<IndexStatusResponse> reindexDocument(
             @PathVariable String documentId,
@@ -46,6 +48,7 @@ public class AiIngestionController {
      * Xem document ca nhan da san sang chat chua.
      * COMPLETED nghia la co chunks de retrieval.
      */
+    @Operation(summary = "Get personal document AI index status")
     @GetMapping("/documents/{documentId}/index-status")
     public ApiResponse<IndexStatusResponse> getDocumentIndexStatus(
             @PathVariable String documentId,
@@ -61,6 +64,7 @@ public class AiIngestionController {
      * Chay lai index cho file trong group.
      * Chi approved member cua group moi duoc goi.
      */
+    @Operation(summary = "Reindex group document for AI")
     @PostMapping("/groups/{groupId}/documents/{groupFileId}/reindex")
     public ApiResponse<IndexStatusResponse> reindexGroupFile(
             @PathVariable String groupId,
@@ -79,6 +83,7 @@ public class AiIngestionController {
      * Xem trang thai index cua file trong group.
      * Chi approved member cua group moi duoc xem.
      */
+    @Operation(summary = "Get group document AI index status")
     @GetMapping("/groups/{groupId}/documents/{groupFileId}/index-status")
     public ApiResponse<IndexStatusResponse> getGroupFileIndexStatus(
             @PathVariable String groupId,
