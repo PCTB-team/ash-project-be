@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.request.CreateFolderRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.FolderResponse;
 import com.pctb.webapp.service.FolderService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.util.List;
 public class FolderController {
     FolderService folderService;
 
+    @Operation(summary = "Create folder")
     @PostMapping
     public ApiResponse<FolderResponse> createFolder(
             @RequestBody @Valid CreateFolderRequest request,
@@ -36,6 +38,7 @@ public class FolderController {
                 .build();
     }
 
+    @Operation(summary = "Get current user folders")
     @GetMapping
     public ApiResponse<List<FolderResponse>> getMyFolders(
             @RequestParam(value = "parentFolderId", required = false) String parentFolderId,

@@ -3,6 +3,7 @@ package com.pctb.webapp.controller;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.DocumentUploadResponse;
 import com.pctb.webapp.service.DocumentUploadService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -21,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentUpLoadController {
     DocumentUploadService documentUploadService;
 
+    @Operation(summary = "Upload current user document")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<DocumentUploadResponse> upload(
             @RequestParam("file") MultipartFile file,

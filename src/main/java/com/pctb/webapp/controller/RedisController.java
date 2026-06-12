@@ -5,6 +5,7 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.service.RedisService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RedisController {
     RedisService redisService;
 
+    @Operation(summary = "Set Redis key")
     @PostMapping("/set")
     public ApiResponse<String> set(@RequestBody @Valid RedisRequest request) {
 
@@ -35,6 +37,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Set Redis key with TTL")
     @PostMapping("/set-with-ttl")
     public ApiResponse<String> setWithTtl(@RequestBody @Valid RedisRequest request) {
 
@@ -47,6 +50,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Get Redis key value")
     @GetMapping("/get")
     public ApiResponse<String> get(@RequestParam(required = false) String key) {
         validateKey(key);
@@ -57,6 +61,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Delete Redis key")
     @DeleteMapping("/delete")
     public ApiResponse<Boolean> delete(@RequestParam(required = false) String key) {
         validateKey(key);
@@ -69,6 +74,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Increment Redis key")
     @PostMapping("/increment")
     public ApiResponse<Long> increment(@RequestParam(required = false) String key) {
         validateKey(key);
@@ -79,6 +85,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Set Redis key expiration")
     @PostMapping("/expire")
     public ApiResponse<Boolean> expire(
             @RequestParam(required = false) String key,
@@ -92,6 +99,7 @@ public class RedisController {
                 .build();
     }
 
+    @Operation(summary = "Get Redis key TTL")
     @GetMapping("/ttl")
     public ApiResponse<Long> ttl(@RequestParam(required = false) String key) {
         validateKey(key);

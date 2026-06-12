@@ -1,5 +1,6 @@
 package com.pctb.webapp.service;
 
+import com.pctb.webapp.ai.service.DocumentIngestionService;
 import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.entity.GroupFile;
 import com.pctb.webapp.entity.GroupMember;
@@ -42,6 +43,8 @@ public class GroupFileService {
 
     StorageService storageService;
 
+    DocumentIngestionService documentIngestionService;
+
     /**
      * Upload file vao group.
      * User phai la member APPROVED va canUpload=true moi duoc upload.
@@ -74,7 +77,10 @@ public class GroupFileService {
                 .deleted(false)
                 .build();
 
-        return buildGroupFileResponse(groupFileRepo.save(groupFile));
+        groupFile = groupFileRepo.save(groupFile);
+        documentIngestionService.ingestGroupFile(group.getId(), groupFile.getId());
+
+        return buildGroupFileResponse(groupFile);
     }
 
     /**

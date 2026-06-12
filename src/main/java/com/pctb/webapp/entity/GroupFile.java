@@ -1,7 +1,10 @@
 package com.pctb.webapp.entity;
 
+import com.pctb.webapp.ai.entity.IngestionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -49,6 +52,16 @@ public class GroupFile {
 
     @Column(nullable = false)
     String storageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    IngestionStatus ingestionStatus = IngestionStatus.PENDING;
+
+    @Column(columnDefinition = "TEXT")
+    String ingestionError;
+
+    LocalDateTime lastIngestedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
