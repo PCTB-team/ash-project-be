@@ -29,24 +29,24 @@ public class GroupFileController {
     GroupFileService groupFileService;
 
     /**
-     * Member upload file vao group.
-     * Backend se check member APPROVED va canUpload=true truoc khi luu file.
+     * Member uploads a file to a group.
      */
     @Operation(summary = "Upload file to group")
     @PostMapping(value = "/{groupId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<GroupFileResponse> uploadFile(
             @PathVariable String groupId,
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "replaceExisting", defaultValue = "false") Boolean replaceExisting,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<GroupFileResponse>builder()
                 .message("Upload group file successfully")
-                .result(groupFileService.uploadFile(groupId, file, authentication))
+                .result(groupFileService.uploadFile(groupId, file, replaceExisting, authentication))
                 .build();
     }
 
     /**
-     * Member da APPROVED xem danh sach file trong group.
+     * Members can view active group files.
      */
     @Operation(summary = "Get group files")
     @GetMapping("/{groupId}/files")
@@ -61,83 +61,51 @@ public class GroupFileController {
     }
 
     /**
-     * Member upload document vao group.
-     * Route nay dung theo design moi, logic giong /files.
+     * Leader moves a group file to trash.
      */
-    @Operation(summary = "Upload document to group")
-    @PostMapping(value = "/{groupId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<GroupFileResponse> uploadDocument(
+    @Operation(summary = "Move group file to trash")
+    @DeleteMapping("/{groupId}/files/{fileId}")
+    public ApiResponse<String> moveFileToTrash(
             @PathVariable String groupId,
-            @RequestParam("file") MultipartFile file,
+            @PathVariable String fileId,
             JwtAuthenticationToken authentication
     ) {
-        return ApiResponse.<GroupFileResponse>builder()
-                .message("Upload group document successfully")
-                .result(groupFileService.uploadDocument(groupId, file, authentication))
-                .build();
-    }
-
-    /**
-     * Member da APPROVED xem document active trong group.
-     */
-    @Operation(summary = "Get active group documents")
-    @GetMapping("/{groupId}/documents")
-    public ApiResponse<List<GroupFileResponse>> getActiveDocuments(
-            @PathVariable String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<List<GroupFileResponse>>builder()
-                .message("Get group documents successfully")
-                .result(groupFileService.getActiveDocuments(groupId, authentication))
-                .build();
-    }
-
-    /**
-     * Leader dua document vao trash.
-     */
-    @Operation(summary = "Move group document to trash")
-    @DeleteMapping("/{groupId}/documents/{documentId}")
-    public ApiResponse<String> moveDocumentToTrash(
-            @PathVariable String groupId,
-            @PathVariable String documentId,
-            JwtAuthenticationToken authentication
-    ) {
-        groupFileService.moveDocumentToTrash(groupId, documentId, authentication);
+        groupFileService.moveFileToTrash(groupId, fileId, authentication);
 
         return ApiResponse.<String>builder()
-                .message("Move group document to trash successfully")
+                .message("Move group file to trash successfully")
                 .result("DELETED")
                 .build();
     }
 
     /**
-     * Leader xem document trong trash cua group.
+     * Leader views trashed group files.
      */
-    @Operation(summary = "Get group trash documents")
-    @GetMapping("/{groupId}/trash/documents")
-    public ApiResponse<List<GroupFileResponse>> getTrashDocuments(
+    @Operation(summary = "Get group trash files")
+    @GetMapping("/{groupId}/trash/files")
+    public ApiResponse<List<GroupFileResponse>> getTrashFiles(
             @PathVariable String groupId,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<List<GroupFileResponse>>builder()
-                .message("Get group trash documents successfully")
-                .result(groupFileService.getTrashDocuments(groupId, authentication))
+                .message("Get group trash files successfully")
+                .result(groupFileService.getTrashFiles(groupId, authentication))
                 .build();
     }
 
     /**
-     * Leader restore document tu trash ve danh sach active.
+     * Leader restores a group file from trash.
      */
-    @Operation(summary = "Restore group document from trash")
-    @PutMapping("/{groupId}/documents/{documentId}/restore")
-    public ApiResponse<GroupFileResponse> restoreDocument(
+    @Operation(summary = "Restore group file from trash")
+    @PutMapping("/{groupId}/files/{fileId}/restore")
+    public ApiResponse<GroupFileResponse> restoreFile(
             @PathVariable String groupId,
-            @PathVariable String documentId,
+            @PathVariable String fileId,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<GroupFileResponse>builder()
-                .message("Restore group document successfully")
-                .result(groupFileService.restoreDocument(groupId, documentId, authentication))
+                .message("Restore group file successfully")
+                .result(groupFileService.restoreFile(groupId, fileId, authentication))
                 .build();
     }
 }

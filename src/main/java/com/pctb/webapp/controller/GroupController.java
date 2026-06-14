@@ -6,6 +6,7 @@ import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
+import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.service.GroupService;
@@ -22,8 +23,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/groups")
@@ -50,7 +49,7 @@ public class GroupController {
 
     /**
      * Xem preview group bang inviteToken.
-     * API nay khong tra passwordHash.
+     * API nay khong tra password.
      */
     @Operation(summary = "Get group preview by invite token")
     @GetMapping("/invite/{inviteToken}")
@@ -62,10 +61,10 @@ public class GroupController {
     }
 
     /**
-     * User gui yeu cau join group bang inviteToken va password group.
-     * Neu hop le, request se o trang thai PENDING.
+     * User join group bang inviteToken va password group.
+     * Neu hop le, member vao group ngay nhung chua co quyen upload file.
      */
-    @Operation(summary = "Request to join group by invite token")
+    @Operation(summary = "Join group by invite token")
     @PostMapping("/invite/{inviteToken}/join")
     public ApiResponse<String> joinByInvite(
             @PathVariable String inviteToken,
@@ -75,61 +74,13 @@ public class GroupController {
         groupService.joinByInvite(inviteToken, request, authentication);
 
         return ApiResponse.<String>builder()
-                .message("Join request sent successfully")
-                .result("PENDING")
+                .message("Join group successfully")
+                .result("APPROVED")
                 .build();
     }
 
     /**
-     * Leader xem danh sach member dang cho duyet.
-     */
-    @Operation(summary = "Get pending group members")
-    @GetMapping("/{groupId}/pending-members")
-    public ApiResponse<List<GroupMemberResponse>> getPendingMembers(
-            @PathVariable String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<List<GroupMemberResponse>>builder()
-                .message("Get pending members successfully")
-                .result(groupService.getPendingMembers(groupId, authentication))
-                .build();
-    }
-
-    /**
-     * Leader duyet member vao group.
-     * Sau khi approve, member van can leader bat canUpload de upload file.
-     */
-    @Operation(summary = "Approve pending group member")
-    @PutMapping("/{groupId}/members/{memberId}/approve")
-    public ApiResponse<GroupMemberResponse> approveMember(
-            @PathVariable String groupId,
-            @PathVariable String memberId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<GroupMemberResponse>builder()
-                .message("Approve member successfully")
-                .result(groupService.approveMember(groupId, memberId, authentication))
-                .build();
-    }
-
-    /**
-     * Leader tu choi request join cua member.
-     */
-    @Operation(summary = "Reject pending group member")
-    @PutMapping("/{groupId}/members/{memberId}/reject")
-    public ApiResponse<GroupMemberResponse> rejectMember(
-            @PathVariable String groupId,
-            @PathVariable String memberId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<GroupMemberResponse>builder()
-                .message("Reject member successfully")
-                .result(groupService.rejectMember(groupId, memberId, authentication))
-                .build();
-    }
-
-    /**
-     * Leader bat hoac tat quyen upload file cua member da APPROVED.
+     * Leader bat hoac tat quyen upload file cua member.
      */
     @Operation(summary = "Update group member upload permission")
     @PutMapping("/{groupId}/members/{memberId}/upload-permission")
@@ -146,8 +97,8 @@ public class GroupController {
     }
 
     /**
-     * Leader kick member da APPROVED khoi group.
-     * Backend giu membership record va chuyen status sang LEFT.
+     * Leader kick member khoi group.
+     * Backend xoa membership record, user co the join lai bang invite link.
      */
     @Operation(summary = "Kick group member")
     @PutMapping("/{groupId}/members/{memberId}/kick")
@@ -178,7 +129,37 @@ public class GroupController {
     }
 
     /**
-     * Member da APPROVED xem thong ke member/document/trash trong group.
+     * Member trong group xem so luong thanh vien hien tai.
+     */
+    @Operation(summary = "Get group member count")
+    @GetMapping("/{groupId}/members/count")
+    public ApiResponse<Long> getMemberCount(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<Long>builder()
+                .message("Get group member count successfully")
+                .result(groupService.getMemberCount(groupId, authentication))
+                .build();
+    }
+
+    /**
+     * Leader xem danh sach member de lay memberId kick hoac cap quyen upload.
+     */
+    @Operation(summary = "Get group members")
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<GroupMembersResponse> getMembers(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupMembersResponse>builder()
+                .message("Get group members successfully")
+                .result(groupService.getMembers(groupId, authentication))
+                .build();
+    }
+
+    /**
+     * Member trong group xem thong ke member/document/trash trong group.
      */
     @Operation(summary = "Get group statistics")
     @GetMapping("/{groupId}/statistics")

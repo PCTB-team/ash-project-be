@@ -8,28 +8,20 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMemberResponse {
-    String memberId;
+public class GroupMembersResponse {
+    String groupId;
 
-    String userId;
+    String groupName;
 
-    String username;
+    Long totalMembers;
 
-    String fullname;
-
-    String email;
-
-    String avatarUrl;
-
-    String role;
-
-    Boolean canUpload;
-
-    String joinedAt;
+    List<GroupMemberResponse> members;
 }
