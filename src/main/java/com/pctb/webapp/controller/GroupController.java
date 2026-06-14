@@ -9,6 +9,7 @@ import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.service.GroupService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class GroupController {
      * Tao private group moi.
      * Leader nhan ve groupId noi bo va inviteLink de share cho user khac.
      */
+    @Operation(summary = "Create private group")
     @PostMapping
     public ApiResponse<CreateGroupResponse> createGroup(
             @RequestBody @Valid CreateGroupRequest request,
@@ -50,6 +52,7 @@ public class GroupController {
      * Xem preview group bang inviteToken.
      * API nay khong tra passwordHash.
      */
+    @Operation(summary = "Get group preview by invite token")
     @GetMapping("/invite/{inviteToken}")
     public ApiResponse<GroupPreviewResponse> getGroupPreview(@PathVariable String inviteToken) {
         return ApiResponse.<GroupPreviewResponse>builder()
@@ -62,6 +65,7 @@ public class GroupController {
      * User gui yeu cau join group bang inviteToken va password group.
      * Neu hop le, request se o trang thai PENDING.
      */
+    @Operation(summary = "Request to join group by invite token")
     @PostMapping("/invite/{inviteToken}/join")
     public ApiResponse<String> joinByInvite(
             @PathVariable String inviteToken,
@@ -79,6 +83,7 @@ public class GroupController {
     /**
      * Leader xem danh sach member dang cho duyet.
      */
+    @Operation(summary = "Get pending group members")
     @GetMapping("/{groupId}/pending-members")
     public ApiResponse<List<GroupMemberResponse>> getPendingMembers(
             @PathVariable String groupId,
@@ -94,6 +99,7 @@ public class GroupController {
      * Leader duyet member vao group.
      * Sau khi approve, member van can leader bat canUpload de upload file.
      */
+    @Operation(summary = "Approve pending group member")
     @PutMapping("/{groupId}/members/{memberId}/approve")
     public ApiResponse<GroupMemberResponse> approveMember(
             @PathVariable String groupId,
@@ -109,6 +115,7 @@ public class GroupController {
     /**
      * Leader tu choi request join cua member.
      */
+    @Operation(summary = "Reject pending group member")
     @PutMapping("/{groupId}/members/{memberId}/reject")
     public ApiResponse<GroupMemberResponse> rejectMember(
             @PathVariable String groupId,
@@ -124,6 +131,7 @@ public class GroupController {
     /**
      * Leader bat hoac tat quyen upload file cua member da APPROVED.
      */
+    @Operation(summary = "Update group member upload permission")
     @PutMapping("/{groupId}/members/{memberId}/upload-permission")
     public ApiResponse<GroupMemberResponse> updateUploadPermission(
             @PathVariable String groupId,
@@ -141,6 +149,7 @@ public class GroupController {
      * Leader kick member da APPROVED khoi group.
      * Backend giu membership record va chuyen status sang LEFT.
      */
+    @Operation(summary = "Kick group member")
     @PutMapping("/{groupId}/members/{memberId}/kick")
     public ApiResponse<GroupMemberResponse> kickMember(
             @PathVariable String groupId,
@@ -156,6 +165,7 @@ public class GroupController {
     /**
      * Leader tao inviteToken moi khi link cu bi lo.
      */
+    @Operation(summary = "Regenerate group invite token")
     @PutMapping("/{groupId}/regenerate-invite-token")
     public ApiResponse<CreateGroupResponse> regenerateInviteToken(
             @PathVariable String groupId,
@@ -170,6 +180,7 @@ public class GroupController {
     /**
      * Member da APPROVED xem thong ke member/document/trash trong group.
      */
+    @Operation(summary = "Get group statistics")
     @GetMapping("/{groupId}/statistics")
     public ApiResponse<GroupStatisticsResponse> getStatistics(
             @PathVariable String groupId,

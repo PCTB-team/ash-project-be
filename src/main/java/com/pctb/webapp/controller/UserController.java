@@ -7,7 +7,6 @@ import com.pctb.webapp.dto.response.UserResponse;
 import com.pctb.webapp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +29,7 @@ public class UserController {
     UserService userService;
 
     // Đưa ra API
+    @Operation(summary = "Get all users")
     @GetMapping
     public ApiResponse<List<UserResponse>> getAllUser(){
 
@@ -40,7 +40,7 @@ public class UserController {
 
     // api lâý profile gọi userprofile.service
     // Lấy profile của user đang đăng nhập dựa trên userId nằm trong JWT.
-    @Operation(summary = "Get current user profile", security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(summary = "Get current user profile")
     @GetMapping("/profile")
     public ApiResponse<UserProfileResponse> getProfile(
             @Parameter(hidden = true) JwtAuthenticationToken authentication
@@ -54,7 +54,7 @@ public class UserController {
     }
 
     // Cập nhật profile bằng multipart/form-data để nhận text field và file avatar.
-    @Operation(summary = "Update current user profile", security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(summary = "Update current user profile")
     @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UserProfileResponse> updateProfile(
             @Parameter(hidden = true) JwtAuthenticationToken authentication,

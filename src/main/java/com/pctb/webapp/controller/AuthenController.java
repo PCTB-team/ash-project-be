@@ -2,7 +2,6 @@ package com.pctb.webapp.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.pctb.webapp.dto.request.LoginRequest;
 import com.pctb.webapp.dto.request.LogoutRequest;
 import com.pctb.webapp.dto.request.OtpRequest;
@@ -41,6 +40,7 @@ public class AuthenController {
     AuthenService authenService;
     OtpService otpService;
 
+    @Operation(summary = "Register new account")
     @PostMapping("/register") //
     public ApiResponse<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
         return ApiResponse.<RegisterResponse>builder()
@@ -49,6 +49,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Login account")
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
         return ApiResponse.<LoginResponse>builder()
@@ -57,6 +58,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Refresh access token")
     @PostMapping("/refresh-token")
     public ApiResponse<LoginResponse> refreshToken(@RequestBody @Valid RefreshTokenRequest request) {
         return ApiResponse.<LoginResponse>builder()
@@ -65,6 +67,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Test new access token")
     @PostMapping("/test-new-access-token")
     public ApiResponse<RefreshTokenTestResponse> testNewAccessToken(@RequestBody @Valid RefreshTokenRequest request) {
         return ApiResponse.<RefreshTokenTestResponse>builder()
@@ -73,7 +76,7 @@ public class AuthenController {
                 .build();
     }
 
-    @Operation(summary = "Logout account", security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(summary = "Logout account")
     @PostMapping("/logout")
     public ApiResponse<LogoutResponse> logout(
             @RequestBody @Valid LogoutRequest request,
@@ -94,6 +97,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Resend registration OTP")
     @PostMapping("/otp-requests")
     public ApiResponse<OtpResponse> resendOtp(@RequestBody @Valid OtpRequest request) {
         return ApiResponse.<OtpResponse>builder()
@@ -102,6 +106,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Verify registration OTP")
     @PostMapping("/otp-verification")
     public ApiResponse<OtpResponse> verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
         return ApiResponse.<OtpResponse>builder()
@@ -109,6 +114,7 @@ public class AuthenController {
                 .result(otpService.verifyOtp(request.getEmail(), request.getOtp()))
                 .build();
     }
+    @Operation(summary = "Send forgot password OTP")
     @PostMapping("/forgot-password/send-otp")
     public ApiResponse<Map<String, String>> sendOtpForgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -121,6 +127,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Verify forgot password OTP")
     @PostMapping("/forgot-password/verify-otp")
     public ApiResponse<Map<String, String>> verifyOtpForgotPassword(
             @Valid @RequestBody VerifyForgotPasswordOtpRequest request) {
@@ -134,6 +141,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Reset password")
     @PostMapping("/forgot-password/reset")
     public ApiResponse<Object> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
@@ -146,6 +154,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Resend forgot password OTP")
     @PostMapping("/forgot-password/resend-otp")
     public ApiResponse<Map<String, String>> resendForgotPasswordOtp(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -158,6 +167,7 @@ public class AuthenController {
                 .build();
     }
 
+    @Operation(summary = "Login with Google")
     @PostMapping("/google-login")
     public ApiResponse<LoginResponse> googleLogin(@RequestBody @Valid GoogleLoginRequest request) {
         return ApiResponse.<LoginResponse>builder()

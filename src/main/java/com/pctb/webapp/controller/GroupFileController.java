@@ -3,6 +3,7 @@ package com.pctb.webapp.controller;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.service.GroupFileService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,6 +32,7 @@ public class GroupFileController {
      * Member upload file vao group.
      * Backend se check member APPROVED va canUpload=true truoc khi luu file.
      */
+    @Operation(summary = "Upload file to group")
     @PostMapping(value = "/{groupId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<GroupFileResponse> uploadFile(
             @PathVariable String groupId,
@@ -46,6 +48,7 @@ public class GroupFileController {
     /**
      * Member da APPROVED xem danh sach file trong group.
      */
+    @Operation(summary = "Get group files")
     @GetMapping("/{groupId}/files")
     public ApiResponse<List<GroupFileResponse>> getGroupFiles(
             @PathVariable String groupId,
@@ -61,6 +64,7 @@ public class GroupFileController {
      * Member upload document vao group.
      * Route nay dung theo design moi, logic giong /files.
      */
+    @Operation(summary = "Upload document to group")
     @PostMapping(value = "/{groupId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<GroupFileResponse> uploadDocument(
             @PathVariable String groupId,
@@ -76,6 +80,7 @@ public class GroupFileController {
     /**
      * Member da APPROVED xem document active trong group.
      */
+    @Operation(summary = "Get active group documents")
     @GetMapping("/{groupId}/documents")
     public ApiResponse<List<GroupFileResponse>> getActiveDocuments(
             @PathVariable String groupId,
@@ -90,6 +95,7 @@ public class GroupFileController {
     /**
      * Leader dua document vao trash.
      */
+    @Operation(summary = "Move group document to trash")
     @DeleteMapping("/{groupId}/documents/{documentId}")
     public ApiResponse<String> moveDocumentToTrash(
             @PathVariable String groupId,
@@ -107,6 +113,7 @@ public class GroupFileController {
     /**
      * Leader xem document trong trash cua group.
      */
+    @Operation(summary = "Get group trash documents")
     @GetMapping("/{groupId}/trash/documents")
     public ApiResponse<List<GroupFileResponse>> getTrashDocuments(
             @PathVariable String groupId,
@@ -121,6 +128,7 @@ public class GroupFileController {
     /**
      * Leader restore document tu trash ve danh sach active.
      */
+    @Operation(summary = "Restore group document from trash")
     @PutMapping("/{groupId}/documents/{documentId}/restore")
     public ApiResponse<GroupFileResponse> restoreDocument(
             @PathVariable String groupId,

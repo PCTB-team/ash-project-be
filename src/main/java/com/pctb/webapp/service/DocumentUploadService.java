@@ -1,5 +1,6 @@
 package com.pctb.webapp.service;
 
+import com.pctb.webapp.ai.service.DocumentIngestionService;
 import com.pctb.webapp.dto.response.DocumentUploadResponse;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
@@ -38,6 +39,8 @@ public class DocumentUploadService {
     FileValidationService fileValidationService;
 
     StorageService storageService;
+
+    DocumentIngestionService documentIngestionService;
 
     @Value("${app.upload.max-user-storage}")
     @NonFinal
@@ -99,6 +102,7 @@ public class DocumentUploadService {
 
         document = documentRepo.save(document);
         updateFolderSizeCascade(folder, file.getSize());
+        documentIngestionService.ingestPersonalDocument(document.getId(), owner.getId());
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())

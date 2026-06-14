@@ -7,6 +7,7 @@ import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
 import com.pctb.webapp.dto.response.FilteredDocumentResponse;
 import com.pctb.webapp.service.DocumentService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import java.util.List;
 public class DocumentController {
     DocumentService documentService;
 
+    @Operation(summary = "Get current user documents")
     @GetMapping
     public ApiResponse<List<DocumentResponse>> getMyDocuments(JwtAuthenticationToken authentication) {
         return ApiResponse.<List<DocumentResponse>>builder()
@@ -44,6 +46,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Get current user documents by page")
     @GetMapping("/page")
     public ApiResponse<Page<DocumentResponse>> getMyDocumentsPage(
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -57,6 +60,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Filter current user documents by file type")
     @GetMapping("/filter")
     public ApiResponse<FilteredDocumentResponse> filterMyDocumentsByFileType(
             @RequestParam("fileType") String fileType,
@@ -69,6 +73,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Get current user trash documents")
     @GetMapping("/filter/documents")
     public ApiResponse<FilteredDocumentResponse> filterMyDocumentFiles(
             @RequestParam(value = "folderId", required = false) String folderId,
@@ -88,6 +93,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Download current user document")
     @GetMapping("/{documentId}/download")
     public ResponseEntity<Resource> downloadMyDocument(
             @PathVariable String documentId,
@@ -98,6 +104,7 @@ public class DocumentController {
         return buildFileResponse(response, ContentDisposition.attachment());
     }
 
+    @Operation(summary = "View current user document")
     @GetMapping("/{documentId}/view")
     public ResponseEntity<Resource> viewMyDocument(
             @PathVariable String documentId,
@@ -108,6 +115,7 @@ public class DocumentController {
         return buildFileResponse(response, ContentDisposition.inline());
     }
 
+    @Operation(summary = "Move current user document to trash")
     @DeleteMapping("/{documentId}")
     public ApiResponse<DeleteDocumentResponse> deleteMyDocument(
             @PathVariable String documentId,
@@ -119,6 +127,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Restore current user document from trash")
     @PutMapping("/{documentId}/restore")
     public ApiResponse<DocumentResponse> restoreMyDocument(
             @PathVariable String documentId,
@@ -130,6 +139,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Delete current user document permanently")
     @DeleteMapping("/{documentId}/permanent")
     public ApiResponse<DeleteDocumentResponse> deleteMyDocumentPermanently(
             @PathVariable String documentId,
@@ -141,6 +151,7 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Update current user document metadata")
     @PutMapping("/{documentId}")
     public ApiResponse<DocumentResponse> updateMyDocument(
             @PathVariable String documentId,

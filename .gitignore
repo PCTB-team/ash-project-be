@@ -210,3 +210,6 @@ nbdist/
 .nb-gradle/
 
 # End of https://www.toptal.com/developers/gitignore/api/maven,intellij,netbeans,eclipse
+
+# Local environment runner with secrets
+start.ps1
