@@ -43,6 +43,7 @@ public class DocumentService {
 
     FileValidationService fileValidationService;
 
+    // Lấy toàn bộ tài liệu active của user hiện tại, sắp xếp theo thời gian tạo mới nhất.
     public List<DocumentResponse> getMyDocuments(JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
 
@@ -56,6 +57,7 @@ public class DocumentService {
         return documentResponses;
     }
 
+    // Lấy tài liệu active của user theo phân trang và folder hiện tại để frontend render danh sách lớn.
     public Page<DocumentResponse> getMyDocumentsPage(
             JwtAuthenticationToken authentication,
             int page,
@@ -79,6 +81,7 @@ public class DocumentService {
                 .map(this::buildDocumentResponse);
     }
 
+    // Lọc tài liệu của user theo nhóm loại file như document, image, audio, video hoặc presentation.
     public FilteredDocumentResponse filterMyDocumentsByFileType(
             JwtAuthenticationToken authentication,
             String fileType,
@@ -110,6 +113,7 @@ public class DocumentService {
                 .build();
     }
 
+    // Lọc tài liệu theo folder, fileType và keyword; hỗ trợ phân trang cho màn hình quản lý file.
     public FilteredDocumentResponse filterMyDocumentFiles(
             JwtAuthenticationToken authentication,
             String folderId
@@ -141,6 +145,7 @@ public class DocumentService {
     }
 
     @Transactional
+    // Đưa tài liệu của user vào thùng rác bằng soft delete và cập nhật lại dung lượng folder liên quan.
     public DeleteDocumentResponse deleteMyDocument(String documentId, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
 
@@ -169,6 +174,7 @@ public class DocumentService {
                 .build();
     }
 
+    // Lấy danh sách tài liệu đang nằm trong thùng rác của user hiện tại.
     public List<DocumentResponse> getMyTrashDocuments(JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
 
@@ -183,6 +189,7 @@ public class DocumentService {
     }
 
     @Transactional
+    // Khôi phục tài liệu từ thùng rác về trạng thái active và cộng lại dung lượng folder.
     public DocumentResponse restoreMyDocument(String documentId, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
 
@@ -212,6 +219,7 @@ public class DocumentService {
     }
 
     @Transactional
+    // Xóa vĩnh viễn tài liệu của user khỏi storage và database, thường dùng khi dọn thùng rác.
     public DeleteDocumentResponse deleteMyDocumentPermanently(
             String documentId,
             JwtAuthenticationToken authentication
@@ -242,6 +250,7 @@ public class DocumentService {
                 .build();
     }
 
+    // Kiểm tra quyền sở hữu rồi trả thông tin download/resource để controller stream file cho client.
     public DownloadDocumentResponse downloadMyDocument(
             String documentId,
             JwtAuthenticationToken authentication
@@ -273,6 +282,7 @@ public class DocumentService {
     }
 
     @Transactional
+    // Cập nhật tên tài liệu và/hoặc folder chứa tài liệu, đồng thời rename file trong storage nếu tên đổi.
     public DocumentResponse updateMyDocument(
             String documentId,
             UpdateDocumentRequest request,
@@ -319,11 +329,13 @@ public class DocumentService {
         return buildDocumentResponse(document);
     }
 
+    // Tìm folder theo id và user; null nghĩa là tài liệu nằm ở root.
     private Folder resolveFolder(String folderId, String userId) {
         return folderRepo.findActiveByIdAndOwnerId(folderId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
     }
 
+    // Cập nhật dung lượng folder hiện tại và toàn bộ folder cha khi file bị thêm, xóa, restore hoặc di chuyển.
     private void updateFolderSizeCascade(Folder folder, long delta) {
         Folder current = folder;
 
@@ -336,10 +348,12 @@ public class DocumentService {
         }
     }
 
+    // Lấy fileSize an toàn, trả về 0 nếu dữ liệu cũ bị null.
     private long safeFileSize(Document document) {
         return document.getFileSize() == null ? 0 : document.getFileSize();
     }
 
+    // Chuẩn hóa id optional: null hoặc blank thành null, còn giá trị hợp lệ thì trim.
     private String normalizeOptionalId(String id) {
         if (id == null || id.isBlank()) {
             return null;
@@ -348,6 +362,7 @@ public class DocumentService {
         return id.trim();
     }
 
+    // Chuyển fileType từ request thành danh sách extension tương ứng để query database.
     private List<String> resolveFileTypeExtensions(String fileType) {
         String normalizedFileType = normalizeFileType(fileType);
 
@@ -364,6 +379,7 @@ public class DocumentService {
         };
     }
 
+    // Chuẩn hóa fileType về chữ thường và kiểm tra có thuộc nhóm được hỗ trợ hay không.
     private String normalizeFileType(String fileType) {
         if (fileType == null || fileType.isBlank()) {
             throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
@@ -381,6 +397,7 @@ public class DocumentService {
         return normalizedFileType;
     }
 
+    // Làm sạch tên file người dùng nhập, chặn tên rỗng và loại bỏ path client gửi kèm.
     private String cleanFileName(String fileName) {
         String cleanPath = StringUtils.cleanPath(fileName);
         int slashIndex = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
@@ -392,6 +409,7 @@ public class DocumentService {
         return cleanPath;
     }
 
+    // Tạo tên file mới khi update, giữ extension cũ nếu người dùng chỉ nhập phần tên không có đuôi.
     private String buildUpdatedFileName(String inputFileName, Document document) {
         String cleanFileName = cleanFileName(inputFileName).trim();
 
@@ -411,6 +429,7 @@ public class DocumentService {
         return cleanFileName;
     }
 
+    // Chuyển entity Document sang DTO trả về cho frontend, kèm URL xem/tải và thời gian tương đối.
     private DocumentResponse buildDocumentResponse(Document document) {
         return DocumentResponse.builder()
                 .documentId(document.getId())
@@ -430,14 +449,17 @@ public class DocumentService {
                 .build();
     }
 
+    // Tạo URL xem tài liệu theo convention API hiện tại.
     private String buildDocumentViewUrl(String documentId) {
         return "/documents/" + documentId + "/view";
     }
 
+    // Tạo URL tải tài liệu theo convention API hiện tại.
     private String buildDocumentDownloadUrl(String documentId) {
         return "/documents/" + documentId + "/download";
     }
 
+    // Chuyển thời điểm upload thành chuỗi tương đối như "vừa xong", "3 phút trước".
     private String formatTimeSinceUpload(LocalDateTime uploadedAt) {
         if (uploadedAt == null) {
             return null;

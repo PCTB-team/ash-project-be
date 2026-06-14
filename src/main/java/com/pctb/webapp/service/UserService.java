@@ -21,7 +21,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE,makeFinal = true)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserService {
     UserRepo userRepo;
     DocumentRepo documentRepo;
@@ -29,15 +29,13 @@ public class UserService {
     UserMapper userMapper;
     CloudinaryStorageService CloudinaryStorageService;
     PasswordEncoder passwordEncoder;
-    // Lấy toàn bộ User
-    public List<UserResponse> getUser(){
 
-        List<UserResponse> userResponses = userMapper.toUserResponseList(userRepo.findAll());
-
-        return userResponses;
+    // Lấy toàn bộ user trong hệ thống và chuyển sang DTO để tránh trả trực tiếp entity.
+    public List<UserResponse> getUser() {
+        return userMapper.toUserResponseList(userRepo.findAll());
     }
-// backend lấy đúng user đang đăng nhập trề
-    // Lấy profile của đúng user đang đăng nhập, không cho client tự truyền userId.
+
+    // Lấy profile của đúng user đang đăng nhập dựa trên userId lấy từ token.
     public UserProfileResponse getProfile(String userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -45,7 +43,7 @@ public class UserService {
         return buildUserProfileResponse(user);
     }
 
-    // Luồng chính của update profile: validate dữ liệu, lưu avatar nếu có, đổi password nếu có, rồi lưu DB.
+    // Cập nhật profile gồm fullname, school, avatar và mật khẩu nếu người dùng có yêu cầu đổi mật khẩu.
     public UserProfileResponse updateProfile(String userId, UpdateProfileRequest request) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -78,7 +76,7 @@ public class UserService {
         }
     }
 
-    // Build profile response with statistics that are derived from related tables.
+    // Build profile response và bổ sung các thống kê phụ như số tài liệu và số ngày đăng nhập liên tiếp.
     private UserProfileResponse buildUserProfileResponse(User user) {
         UserProfileResponse response = userMapper.toUserProfileResponse(user);
         response.setDocumentCount(documentRepo.countActiveByOwner(user));
@@ -87,6 +85,7 @@ public class UserService {
         return response;
     }
 
+    // Đếm số ngày đăng nhập liên tiếp của user dựa trên lịch sử login đã được lưu theo từng ngày.
     private long countConsecutiveLoginDays(User user) {
         List<LocalDate> loginDates = userLoginHistoryRepo.findLoginDatesByUserOrderByLoginDateDesc(user);
         if (loginDates.isEmpty()) {
@@ -108,14 +107,14 @@ public class UserService {
         return consecutiveDays;
     }
 
-    // Validate fullname before saving profile changes.
+    // Kiểm tra fullname không được rỗng và không vượt quá độ dài cho phép.
     private void validateFullname(String fullname) {
         if (fullname == null || fullname.isBlank() || fullname.length() > 100) {
             throw new AppException(ErrorCode.PROFILE_FULLNAME_INVALID);
         }
     }
 
-    // Chuẩn hóa field optional: bỏ khoảng trắng dư, nếu rỗng thì lưu null.
+    // Chuẩn hóa field optional: null hoặc chuỗi rỗng được lưu thành null, chuỗi hợp lệ được trim.
     private String normalizeOptionalText(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -124,7 +123,7 @@ public class UserService {
         return value.trim();
     }
 
-    // Chỉ đổi password khi user nhập ít nhất một field password trong form update profile.
+    // Chỉ đổi mật khẩu khi request có ít nhất một field password; nếu có thì validate đủ mật khẩu cũ và mới.
     private void updatePasswordIfRequested(User user, UpdateProfileRequest request) {
         if (!isPasswordChangeRequested(request)) {
             return;
@@ -151,14 +150,14 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(newPassword));
     }
 
-    // Xác định user có đang yêu cầu đổi password hay chỉ cập nhật fullname/school/avatar.
+    // Xác định request có đang yêu cầu đổi mật khẩu hay chỉ cập nhật thông tin profile thông thường.
     private boolean isPasswordChangeRequested(UpdateProfileRequest request) {
         return hasText(request.getOldPassword())
                 || hasText(request.getNewPassword())
                 || hasText(request.getConfirmPassword());
     }
 
-    // Kiểm tra password mới: tối thiểu 8 ký tự và có ít nhất 1 ký tự đặc biệt.
+    // Kiểm tra mật khẩu mới đạt yêu cầu tối thiểu: ít nhất 8 ký tự và có ký tự đặc biệt.
     private void validateNewPassword(String newPassword) {
         if (!hasText(newPassword)
                 || newPassword.length() < 8
@@ -167,10 +166,8 @@ public class UserService {
         }
     }
 
-    // Helper kiểm tra chuỗi có nội dung thật sau khi bỏ khoảng trắng.
+    // Kiểm tra chuỗi có nội dung thật sau khi bỏ khoảng trắng hay không.
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
-
-
 }

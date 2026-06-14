@@ -55,7 +55,9 @@ public class GroupService {
      * Tao private group moi va tao membership LEADER cho nguoi tao group.
      * Leader duoc APPROVED va canUpload=true ngay tu dau.
      */
+    // Tạo group mới, gán user hiện tại làm owner/leader và sinh invite token + join code.
     @Transactional
+    // Lưu group và membership leader trong cùng transaction để group mới luôn có người quản trị.
     public CreateGroupResponse createGroup(
             CreateGroupRequest request,
             JwtAuthenticationToken authentication
@@ -100,7 +102,9 @@ public class GroupService {
      * Lay thong tin group tu inviteToken de frontend hien preview link moi.
      * Khong bao gio tra passwordHash ve client.
      */
+    // Lấy thông tin xem trước của group từ invite token để người dùng biết group trước khi tham gia.
     @Transactional(readOnly = true)
+    // Chỉ đọc dữ liệu preview từ invite token, không thay đổi trạng thái group hay membership.
     public GroupPreviewResponse getGroupPreview(String inviteToken) {
         StudyGroup group = getGroupByInviteToken(inviteToken);
         ensureInviteEnabled(group);
@@ -116,7 +120,9 @@ public class GroupService {
      * User nhap password tu invite link de gui yeu cau join group.
      * Neu hop le thi tao hoac chuyen membership sang PENDING, canUpload=false.
      */
+    // Tạo hoặc cập nhật yêu cầu tham gia group bằng invite token cho user hiện tại.
     @Transactional
+    // Kiểm tra mật khẩu group rồi tạo request PENDING hoặc reset membership cũ được phép gửi lại.
     public void joinByInvite(
             String inviteToken,
             JoinGroupRequest request,
@@ -152,7 +158,9 @@ public class GroupService {
      * Leader xem danh sach member dang cho duyet trong group.
      * Moi request quan ly group deu phai qua requireLeader.
      */
+    // Lấy danh sách member đang chờ duyệt, chỉ leader của group được xem.
     @Transactional
+    // Kiểm tra quyền leader trước khi truy vấn danh sách request đang PENDING.
     public List<GroupMemberResponse> getPendingMembers(
             String groupId,
             JwtAuthenticationToken authentication
@@ -170,7 +178,9 @@ public class GroupService {
      * Leader duyet mot request join.
      * Chi member dang PENDING moi duoc chuyen sang APPROVED.
      */
+    // Duyệt một member đang pending, chuyển trạng thái sang APPROVED và ghi thời điểm tham gia.
     @Transactional
+    // Chuyển member từ PENDING sang APPROVED trong transaction quản trị group.
     public GroupMemberResponse approveMember(
             String groupId,
             String memberId,
@@ -195,7 +205,9 @@ public class GroupService {
      * Leader tu choi mot request join.
      * Member bi REJECTED khong duoc upload va joinedAt bi xoa.
      */
+    // Từ chối yêu cầu tham gia group, đồng thời tắt quyền upload và xóa thời điểm joinedAt.
     @Transactional
+    // Chuyển member PENDING sang REJECTED và đảm bảo member không còn quyền upload.
     public GroupMemberResponse rejectMember(
             String groupId,
             String memberId,
@@ -224,7 +236,9 @@ public class GroupService {
      * Leader bat hoac tat quyen upload cua member da duoc APPROVED.
      * Khong cho cap quyen upload cho member con PENDING/REJECTED/BANNED.
      */
+    // Bật hoặc tắt quyền upload file cho member đã được duyệt trong group.
     @Transactional
+    // Cập nhật canUpload cho member APPROVED sau khi xác nhận người gọi là leader.
     public GroupMemberResponse updateUploadPermission(
             String groupId,
             String memberId,
@@ -251,7 +265,9 @@ public class GroupService {
      * Leader kick member khoi group.
      * Khong xoa record, chi chuyen status sang LEFT va tat quyen upload.
      */
+    // Kick member khỏi group bằng cách chuyển trạng thái sang LEFT và tắt quyền upload.
     @Transactional
+    // Đưa member ra khỏi group bằng status LEFT nhưng vẫn giữ record lịch sử trong database.
     public GroupMemberResponse kickMember(
             String groupId,
             String memberId,
@@ -280,7 +296,9 @@ public class GroupService {
      * Leader tao inviteToken moi khi link cu bi lo.
      * Token cu se mat tac dung vi da bi replace trong database.
      */
+    // Sinh lại invite token và join code mới cho group, làm link mời cũ không còn hiệu lực.
     @Transactional
+    // Replace invite token hiện tại để link mời cũ bị vô hiệu hóa ngay sau khi lưu.
     public CreateGroupResponse regenerateInviteToken(
             String groupId,
             JwtAuthenticationToken authentication
@@ -301,7 +319,9 @@ public class GroupService {
      * Lay thong ke group tu database tai thoi diem request.
      * Khong luu counter vao group de tranh sai so khi upload/delete/restore.
      */
+    // Tính thống kê group gồm số member đã duyệt, số file active và số file trong thùng rác.
     @Transactional
+    // Đọc các counter trực tiếp từ database để tránh sai lệch số liệu lưu sẵn.
     public GroupStatisticsResponse getStatistics(
             String groupId,
             JwtAuthenticationToken authentication
@@ -323,6 +343,7 @@ public class GroupService {
      * Lay current user tu JWT.
      * Trong project nay authentication.getName() chinh la userId.
      */
+    // Lấy user hiện tại từ JWT token; authentication.getName() là userId trong hệ thống.
     private User getCurrentUser(JwtAuthenticationToken authentication) {
         return userRepo.findById(authentication.getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -332,6 +353,7 @@ public class GroupService {
      * Tim group bang id noi bo.
      * Dung cho cac API quan ly sau khi user da login.
      */
+    // Tìm group theo id đã chuẩn hóa, ném lỗi nếu group không tồn tại.
     private StudyGroup getGroupById(String groupId) {
         return studyGroupRepo.findById(normalizeRequiredText(groupId))
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
@@ -341,6 +363,7 @@ public class GroupService {
      * Tim group bang inviteToken.
      * Dung cho preview link va join bang link moi.
      */
+    // Tìm group theo invite token đã chuẩn hóa, dùng cho các luồng preview và join bằng link mời.
     private StudyGroup getGroupByInviteToken(String inviteToken) {
         return studyGroupRepo.findByInviteToken(normalizeRequiredText(inviteToken))
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
@@ -350,6 +373,7 @@ public class GroupService {
      * Check invite link con duoc bat hay khong.
      * Neu leader tat/regenerate link thi link cu khong duoc join nua.
      */
+    // Kiểm tra group có bật join bằng invite hay không trước khi cho phép xem hoặc join.
     private void ensureInviteEnabled(StudyGroup group) {
         if (!Boolean.TRUE.equals(group.getInviteEnabled())) {
             throw new AppException(ErrorCode.GROUP_INVITE_DISABLED);
@@ -360,6 +384,7 @@ public class GroupService {
      * Xu ly khi user da co record membership trong group.
      * PENDING/APPROVED/BANNED se tra loi ro, REJECTED/LEFT duoc gui request lai.
      */
+    // Xử lý user đã có membership cũ: chặn trạng thái không hợp lệ và cho phép gửi lại nếu từng bị reject/left.
     private void handleExistingJoinRequest(GroupMember member) {
         if (member.getJoinStatus() == JoinStatus.PENDING) {
             throw new AppException(ErrorCode.GROUP_JOIN_REQUEST_PENDING);
@@ -384,6 +409,7 @@ public class GroupService {
      * Bat buoc current user phai la LEADER va da APPROVED trong group.
      * Neu user la owner nhung membership bi thieu/le do data cu, ham nay se dong bo lai.
      */
+    // Kiểm tra user hiện tại là leader đã approved; owner được tự sửa membership nếu dữ liệu cũ bị lệch.
     private GroupMember requireLeader(String groupId, User currentUser) {
         String normalizedGroupId = normalizeRequiredText(groupId);
         GroupMember member = groupMemberRepo.findByGroupIdAndUserId(normalizedGroupId, currentUser.getId())
@@ -414,6 +440,7 @@ public class GroupService {
      * Bat buoc current user phai la APPROVED member cua group.
      * Dung cho cac man hinh group member duoc xem nhu statistics.
      */
+    // Kiểm tra user hiện tại là member approved để được xem các màn hình nội bộ của group.
     private GroupMember requireApprovedMember(String groupId, User currentUser) {
         String normalizedGroupId = normalizeRequiredText(groupId);
         GroupMember member = groupMemberRepo.findByGroupIdAndUserId(normalizedGroupId, currentUser.getId())
@@ -443,6 +470,7 @@ public class GroupService {
     /**
      * Tao membership LEADER cho owner neu DB cu chua co record group_member.
      */
+    // Tạo membership LEADER cho owner nếu database cũ chưa có record group_member.
     private GroupMember createOwnerLeaderMembership(StudyGroup group, User owner) {
         GroupMember member = GroupMember.builder()
                 .group(group)
@@ -459,6 +487,7 @@ public class GroupService {
     /**
      * Sua membership cua owner thanh LEADER APPROVED khi data cu bi lech role/status.
      */
+    // Sửa membership của owner thành LEADER APPROVED khi dữ liệu cũ bị lệch role hoặc status.
     private GroupMember syncOwnerLeaderMembership(GroupMember member) {
         member.setRole(GroupRole.LEADER);
         member.setJoinStatus(JoinStatus.APPROVED);
@@ -474,6 +503,7 @@ public class GroupService {
      * Tim member theo memberId va dam bao member do thuoc dung groupId.
      * Chan viec leader group A sua member cua group B.
      */
+    // Tìm member theo memberId và đảm bảo member thuộc đúng group để tránh sửa nhầm group khác.
     private GroupMember getMemberInGroup(String groupId, String memberId) {
         GroupMember member = groupMemberRepo.findById(normalizeRequiredText(memberId))
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
@@ -489,6 +519,7 @@ public class GroupService {
      * Sinh inviteToken UUID va check trung database.
      * UUID rat kho trung, nhung van check de tranh loi unique constraint.
      */
+    // Sinh invite token dạng UUID và kiểm tra trùng database trước khi dùng.
     private String generateInviteToken() {
         for (int attempt = 0; attempt < 10; attempt++) {
             String token = UUID.randomUUID().toString();
@@ -504,6 +535,7 @@ public class GroupService {
      * Sinh joinCode ngan cho cot legacy join_code trong DB cu.
      * Invite link moi khong dung gia tri nay, nhung MySQL cu van bat buoc NOT NULL.
      */
+    // Sinh join code ngắn cho cột legacy join_code để tương thích schema cũ.
     private String generateJoinCode() {
         for (int attempt = 0; attempt < 10; attempt++) {
             String code = UUID.randomUUID()
@@ -522,6 +554,7 @@ public class GroupService {
     /**
      * Tao response tra ve sau khi tao group hoac regenerate invite token.
      */
+    // Tạo response trả về sau khi tạo group hoặc sinh lại invite token.
     private CreateGroupResponse buildCreateGroupResponse(StudyGroup group) {
         return CreateGroupResponse.builder()
                 .groupId(group.getId())
@@ -533,6 +566,7 @@ public class GroupService {
     /**
      * Ghep inviteToken vao base URL de FE co link share cho user khac.
      */
+    // Ghép invite token vào base URL để frontend có link mời hoàn chỉnh.
     private String buildInviteLink(String inviteToken) {
         String baseUrl = inviteBaseUrl == null || inviteBaseUrl.isBlank()
                 ? "http://localhost:3000/join"
@@ -544,6 +578,7 @@ public class GroupService {
     /**
      * Convert GroupMember thanh DTO cho FE, khong tra ve object entity lazy.
      */
+    // Chuyển GroupMember sang DTO cho frontend, tránh trả entity lazy trực tiếp.
     private GroupMemberResponse buildGroupMemberResponse(GroupMember member) {
         User user = member.getUser();
 
@@ -561,6 +596,7 @@ public class GroupService {
     /**
      * Chuan hoa text bat buoc, tranh null/blank va path traversal tu input.
      */
+    // Chuẩn hóa text bắt buộc, chặn null/blank và làm sạch path traversal từ input.
     private String normalizeRequiredText(String value) {
         String normalizedValue = normalizeOptionalText(value);
         if (normalizedValue == null) {
@@ -573,6 +609,7 @@ public class GroupService {
     /**
      * Chuan hoa text tuy chon, null/blank se tra ve null.
      */
+    // Chuẩn hóa text tùy chọn; null hoặc blank trả về null, chuỗi hợp lệ được làm sạch và trim.
     private String normalizeOptionalText(String value) {
         if (value == null) {
             return null;

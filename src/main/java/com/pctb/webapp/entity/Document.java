@@ -1,6 +1,6 @@
 package com.pctb.webapp.entity;
 
-import com.pctb.webapp.ai.entity.IngestionStatus;
+
 import com.pctb.webapp.exception.UploadStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -46,16 +46,6 @@ public class Document {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     UploadStatus status;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    IngestionStatus ingestionStatus = IngestionStatus.PENDING;
-
-    @Column(columnDefinition = "TEXT")
-    String ingestionError;
-
-    LocalDateTime lastIngestedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

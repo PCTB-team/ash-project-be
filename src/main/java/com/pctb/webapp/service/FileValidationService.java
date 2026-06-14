@@ -1,4 +1,5 @@
 package com.pctb.webapp.service;
+
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import org.apache.tika.config.TikaConfig;
@@ -14,10 +15,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+
 @Service
 public class FileValidationService {
     private final TikaConfig tikaConfig;
 
+    // Khởi tạo Apache Tika để đọc nội dung thật của file khi kiểm tra MIME type.
     public FileValidationService() {
         try {
             this.tikaConfig = new TikaConfig();
@@ -26,12 +29,12 @@ public class FileValidationService {
         }
     }
 
-    // Tập hợp các file được hệ thống cho phép
+    // Tập hợp các đuôi file mà hệ thống cho phép người dùng upload.
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "docx", "png", "jpg", "jpeg", "txt", "mp3", "mp4", "ppt", "pptx"
     );
 
-    // xác định mime Type (là kiểu dữ liệu thật của file đó) . Vidu : nếu là png thì phải có image/png để tránh fake đuôi file
+    // Map từng đuôi file sang MIME type hợp lệ để ngăn client fake đuôi file.
     private static final Map<String, Set<String>> ALLOWED_MIME_TYPES = Map.of(
             "pdf", Set.of("application/pdf"),
             "docx", Set.of("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
@@ -44,10 +47,11 @@ public class FileValidationService {
             "ppt", Set.of("application/vnd.ms-powerpoint"),
             "pptx", Set.of("application/vnd.openxmlformats-officedocument.presentationml.presentation")
     );
-    @Value("${app.upload.max-file-size}")
-    private long maxFileSize; // đang là 100MB
 
-    // Hàm kiểm tra validate, truyền va title của file, multipartFile tức là các file được upload lên
+    @Value("${app.upload.max-file-size}")
+    private long maxFileSize;
+
+    // Kiểm tra file upload có tồn tại, không rỗng, không vượt dung lượng, đúng đuôi file và đúng MIME thật.
     public String validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.FILE_REQUIRED_UPLOAD);
@@ -56,18 +60,15 @@ public class FileValidationService {
         if (file.getSize() > maxFileSize) {
             throw new AppException(ErrorCode.FILE_TOO_LARGE);
         }
-        // sẽ lấy ra extension của file : pdf, doc, pptx, .......
+
         String extension = getExtension(file.getOriginalFilename());
 
-        // Kiểm tra coi extension có trong danh sách extension cho phép không
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
         }
 
-        // Detect MIME type from real file content instead of trusting the client.
         String realMimeType = detectRealMimeType(file);
 
-        // Kiểm tra coi mime type đó có nằm trong danh sách cho phép không
         if (!ALLOWED_MIME_TYPES.get(extension).contains(realMimeType)) {
             throw new AppException(ErrorCode.INVALID_MIME_TYPE);
         }
@@ -75,7 +76,7 @@ public class FileValidationService {
         return realMimeType;
     }
 
-    // Trả về extension :pdf
+    // Lấy đuôi file từ tên file gốc và chuẩn hóa về chữ thường để so sánh.
     public String getExtension(String fileName) {
         if (fileName == null || !fileName.contains(".")) {
             throw new AppException(ErrorCode.FILE_TYPE_NOT_SUPPORTED);
@@ -84,14 +85,11 @@ public class FileValidationService {
         return fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
     }
 
-    // Kiểm tra mimeType bằng Apache tika , tức là nó sẽ mở file ra để xác định nó là gì .
+    // Dùng Apache Tika đọc nội dung file để xác định MIME type thật, không chỉ tin dữ liệu client gửi.
     public String detectRealMimeType(MultipartFile file) {
-        // Tạo ra metadata
         Metadata metadata = new Metadata();
-        // Tika lấy tên file ra ,
         metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getOriginalFilename());
 
-        // Đọc nội dung file , kiểm tra và trả về mime type của file
         try (TikaInputStream inputStream = TikaInputStream.get(file.getInputStream())) {
             MediaType mediaType = tikaConfig.getDetector().detect(inputStream, metadata);
             return mediaType.toString();

@@ -1,6 +1,5 @@
 package com.pctb.webapp.service;
 
-import com.pctb.webapp.ai.service.DocumentIngestionService;
 import com.pctb.webapp.dto.response.DocumentUploadResponse;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
@@ -40,13 +39,13 @@ public class DocumentUploadService {
 
     StorageService storageService;
 
-    DocumentIngestionService documentIngestionService;
-
     @Value("${app.upload.max-user-storage}")
     @NonFinal
     long maxUserStorage;
 
+    // Xử lý toàn bộ luồng upload tài liệu cá nhân: xác thực user, kiểm tra file, xử lý replace, lưu storage, lưu DB và trả DTO.
     @Transactional
+    // Bọc upload trong transaction để dữ liệu Document và dung lượng Folder được cập nhật đồng bộ.
     public DocumentUploadResponse upload(
             MultipartFile file,
             Boolean replaceExisting,
@@ -102,7 +101,6 @@ public class DocumentUploadService {
 
         document = documentRepo.save(document);
         updateFolderSizeCascade(folder, file.getSize());
-        documentIngestionService.ingestPersonalDocument(document.getId(), owner.getId());
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())
@@ -120,6 +118,7 @@ public class DocumentUploadService {
                 .build();
     }
 
+    // Tìm folder đích theo id và user; nếu folderId null thì upload vào thư mục gốc.
     private Folder resolveFolder(String folderId, String userId) {
         if (folderId == null) {
             return null;
@@ -129,6 +128,7 @@ public class DocumentUploadService {
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
     }
 
+    // Cộng hoặc trừ dung lượng của folder hiện tại và toàn bộ folder cha để thống kê size luôn đúng.
     private void updateFolderSizeCascade(Folder folder, long delta) {
         Folder current = folder;
 
@@ -141,10 +141,12 @@ public class DocumentUploadService {
         }
     }
 
+    // Lấy fileSize an toàn, tránh lỗi null khi tài liệu cũ thiếu dữ liệu dung lượng.
     private long safeFileSize(Document document) {
         return document.getFileSize() == null ? 0 : document.getFileSize();
     }
 
+    // Chuẩn hóa id optional: chuỗi rỗng được xem là null, chuỗi có dữ liệu thì trim.
     private String normalizeOptionalId(String id) {
         if (id == null || id.isBlank()) {
             return null;
@@ -153,14 +155,17 @@ public class DocumentUploadService {
         return id.trim();
     }
 
+    // Tạo URL xem tài liệu theo convention API hiện tại.
     private String buildDocumentViewUrl(String documentId) {
         return "/documents/" + documentId + "/view";
     }
 
+    // Tạo URL tải tài liệu theo convention API hiện tại.
     private String buildDocumentDownloadUrl(String documentId) {
         return "/documents/" + documentId + "/download";
     }
 
+    // Làm sạch tên file gốc, loại bỏ path nếu client gửi kèm đường dẫn cục bộ.
     private String cleanOriginalFileName(String originalFileName) {
         String cleanPath = StringUtils.cleanPath(originalFileName);
         int slashIndex = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
@@ -172,10 +177,12 @@ public class DocumentUploadService {
         return cleanPath;
     }
 
+    // Tạo tên file lưu trong storage theo userId và UUID để tránh trùng tên vật lý.
     private String buildStoredFileName(String userId, String extension) {
         return "documents/" + userId + "/" + UUID.randomUUID() + "." + extension;
     }
 
+    // Chuyển thời điểm upload thành chuỗi tương đối như "vừa xong", "3 phút trước".
     private String formatTimeSinceUpload(LocalDateTime uploadedAt) {
         if (uploadedAt == null) {
             return null;
@@ -183,36 +190,37 @@ public class DocumentUploadService {
 
         Duration duration = Duration.between(uploadedAt, LocalDateTime.now());
         if (duration.isNegative() || duration.getSeconds() < 5) {
-            return "v\u1eeba xong";
+            return "vừa xong";
         }
 
         long seconds = duration.getSeconds();
         if (seconds < 60) {
-            return seconds + " gi\u00e2y tr\u01b0\u1edbc";
+            return seconds + " giây trước";
         }
 
         long minutes = duration.toMinutes();
         if (minutes < 60) {
-            return minutes + " ph\u00fat tr\u01b0\u1edbc";
+            return minutes + " phút trước";
         }
 
         long hours = duration.toHours();
         if (hours < 24) {
-            return hours + " gi\u1edd tr\u01b0\u1edbc";
+            return hours + " giờ trước";
         }
 
         long days = duration.toDays();
         if (days < 30) {
-            return days + " ng\u00e0y tr\u01b0\u1edbc";
+            return days + " ngày trước";
         }
 
         if (days < 365) {
-            return days / 30 + " th\u00e1ng tr\u01b0\u1edbc";
+            return days / 30 + " tháng trước";
         }
 
-        return days / 365 + " n\u0103m tr\u01b0\u1edbc";
+        return days / 365 + " năm trước";
     }
 
+    // Kiểm tra tổng dung lượng sau upload hoặc replace có vượt giới hạn storage của user hay không.
     private void validateStorageCapacity(User owner, Document existingDocument, long newFileSize) {
         Long usedStorageResult = documentRepo.sumFileSizeByOwner(owner);
         long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
