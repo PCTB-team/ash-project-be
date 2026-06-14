@@ -9,6 +9,4 @@ public interface StudyGroupRepo extends JpaRepository<StudyGroup, String> {
     Optional<StudyGroup> findByInviteToken(String inviteToken);
 
     boolean existsByInviteToken(String inviteToken);
-
-    boolean existsByJoinCode(String joinCode);
 }

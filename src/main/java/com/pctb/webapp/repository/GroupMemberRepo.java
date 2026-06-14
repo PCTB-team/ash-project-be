@@ -1,7 +1,6 @@
 package com.pctb.webapp.repository;
 
 import com.pctb.webapp.entity.GroupMember;
-import com.pctb.webapp.entity.JoinStatus;
 import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,7 +13,7 @@ public interface GroupMemberRepo extends JpaRepository<GroupMember, String> {
 
     Optional<GroupMember> findByGroupIdAndUserId(String groupId, String userId);
 
-    List<GroupMember> findByGroupIdAndJoinStatus(String groupId, JoinStatus joinStatus);
+    List<GroupMember> findByGroupIdOrderByJoinedAtAsc(String groupId);
 
-    long countByGroupIdAndJoinStatus(String groupId, JoinStatus joinStatus);
+    long countByGroupId(String groupId);
 }

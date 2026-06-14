@@ -42,22 +42,10 @@ public class StudyGroup {
     @Column(columnDefinition = "TEXT")
     String description;
 
-    @Column(nullable = false)
-    String passwordHash;
-
     @Column(unique = true, nullable = false)
     String inviteToken;
 
-    // Legacy column kept so existing MySQL tables with join_code NOT NULL can still insert.
-    @Column(name = "join_code", unique = true, nullable = false, length = 20)
-    String joinCode;
-
-    // Legacy column from the old group flow. New logic always creates private groups.
-    @Column(nullable = false, length = 20)
-    String visibility;
-
-    // Legacy password column from the old schema. Keep it synced with passwordHash.
-    @Column(length = 255)
+    @Column(nullable = false, length = 255)
     String password;
 
     @ManyToOne(fetch = FetchType.LAZY)

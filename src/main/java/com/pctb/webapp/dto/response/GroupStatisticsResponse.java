@@ -19,6 +19,8 @@ public class GroupStatisticsResponse {
 
     String groupName;
 
+    Long totalMembers;
+
     Long totalApprovedMembers;
 
     Long totalActiveDocuments;

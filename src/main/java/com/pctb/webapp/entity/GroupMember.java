@@ -23,7 +23,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * Luu quan he user - group, kem trang thai duyet va quyen upload.
+ * Luu quan he user - group, kem role va quyen upload.
  */
 @Entity
 @Getter
@@ -52,10 +52,6 @@ public class GroupMember {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     GroupRole role;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    JoinStatus joinStatus;
 
     @Builder.Default
     @Column(nullable = false)
