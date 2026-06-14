@@ -74,6 +74,17 @@ public class DocumentController {
     }
 
     @Operation(summary = "Get current user trash documents")
+    @GetMapping("/filter/documents")
+    public ApiResponse<FilteredDocumentResponse> filterMyDocumentFiles(
+            @RequestParam(value = "folderId", required = false) String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<FilteredDocumentResponse>builder()
+                .message("Filter document files successfully")
+                .result(documentService.filterMyDocumentFiles(authentication, folderId))
+                .build();
+    }
+
     @GetMapping("/trash")
     public ApiResponse<List<DocumentResponse>> getMyTrashDocuments(JwtAuthenticationToken authentication) {
         return ApiResponse.<List<DocumentResponse>>builder()

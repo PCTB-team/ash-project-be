@@ -110,6 +110,36 @@ public class DocumentService {
                 .build();
     }
 
+    public FilteredDocumentResponse filterMyDocumentFiles(
+            JwtAuthenticationToken authentication,
+            String folderId
+    ) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+
+        if (normalizedFolderId != null) {
+            resolveFolder(normalizedFolderId, userId);
+        }
+
+        List<String> documentExtensions = List.of("doc", "docx", "pdf", "xls", "xlsx", "ppt", "pptx", "txt");
+        List<DocumentResponse> documents = documentRepo
+                .findActiveByOwnerIdAndFolderIdAndFileExtensions(userId, normalizedFolderId, documentExtensions)
+                .stream()
+                .map(this::buildDocumentResponse)
+                .toList();
+        long total = documentRepo.countActiveByOwnerIdAndFolderIdAndFileExtensions(
+                userId,
+                normalizedFolderId,
+                documentExtensions
+        );
+
+        return FilteredDocumentResponse.builder()
+                .fileType("document")
+                .total(total)
+                .documents(documents)
+                .build();
+    }
+
     @Transactional
     public DeleteDocumentResponse deleteMyDocument(String documentId, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
