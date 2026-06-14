@@ -26,11 +26,11 @@ public class CloudinaryStorageService implements StorageService {
     static long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
     static Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of("png", "jpg", "jpeg");
 
-    // 1. Upload tài liệu lên Cloudinary
+    // Upload tài liệu lên Cloudinary, bỏ đuôi file khỏi publicId vì Cloudinary tự quản lý định dạng.
     @Override
+    // Gửi bytes của file lên Cloudinary và trả về secure_url để lưu vào Document.
     public String upload(MultipartFile file, String fileName) {
         try {
-            // Loại bỏ phần mở rộng nếu có trong fileName vì Cloudinary tự quản lý extension
             String publicId = fileName;
             if (publicId.contains(".")) {
                 publicId = publicId.substring(0, publicId.lastIndexOf('.'));
@@ -38,20 +38,20 @@ public class CloudinaryStorageService implements StorageService {
 
             Map params = ObjectUtils.asMap(
                     "public_id", publicId,
-                    "resource_type", "auto", // Tự động nhận diện pdf, docx, png, mp4...
+                    "resource_type", "auto",
                     "overwrite", true
             );
 
             Map uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
-            // Trả về URL HTTPS trực tiếp từ Cloudinary đám mây
             return (String) uploadResult.get("secure_url");
         } catch (IOException exception) {
             throw new AppException(ErrorCode.UPLOAD_FAILED);
         }
     }
 
-    // 2. Xóa tài liệu khỏi Cloudinary dựa vào URL
+    // Xóa tài liệu khỏi Cloudinary dựa trên URL đã lưu; bỏ qua nếu URL rỗng.
     @Override
+    // Xác định publicId/resourceType từ URL rồi gọi Cloudinary destroy.
     public void delete(String storageUrl) {
         if (storageUrl == null || storageUrl.isBlank()) {
             return;
@@ -66,8 +66,9 @@ public class CloudinaryStorageService implements StorageService {
         }
     }
 
-    // 3. Đổi tên/Đổi đường dẫn file trên Cloudinary
+    // Đổi tên hoặc đổi đường dẫn file trên Cloudinary và trả về secure_url mới.
     @Override
+    // Rename publicId trên Cloudinary để đồng bộ với tên file mới trong database.
     public String rename(String oldStorageUrl, String newFileName) {
         try {
             String oldPublicId = extractPublicId(oldStorageUrl);
@@ -87,14 +88,14 @@ public class CloudinaryStorageService implements StorageService {
         }
     }
 
-    // 4. Hàm cũ của Local Storage không cần dùng cho Cloud đám mây
+    // Cloudinary trả file bằng HTTPS URL trực tiếp nên backend không cần load thành Resource như local storage.
     @Override
+    // Không dùng cho Cloudinary vì client có thể truy cập file qua HTTPS URL trực tiếp.
     public Resource loadAsResource(String storageUrl) {
-        // Đối với Cloudinary, Frontend sử dụng trực tiếp Link HTTPS để Preview/Download
         return null;
     }
 
-    // 5. Lưu Avatar người dùng lên Cloudinary
+    // Upload avatar của user lên Cloudinary, ghi đè avatar cũ theo publicId cố định của user.
     public String saveAvatar(String userId, MultipartFile avatar) {
         if (avatar == null || avatar.isEmpty()) {
             return null;
@@ -115,7 +116,7 @@ public class CloudinaryStorageService implements StorageService {
         }
     }
 
-    // 6. Xóa Avatar cũ trên Cloudinary
+    // Xóa avatar cũ trên Cloudinary; nếu xóa thất bại thì không làm hỏng luồng cập nhật profile chính.
     public void deleteAvatar(String avatarUrl) {
         if (avatarUrl == null || avatarUrl.isBlank()) {
             return;
@@ -124,12 +125,11 @@ public class CloudinaryStorageService implements StorageService {
             String publicId = extractPublicId(avatarUrl);
             cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", "image"));
         } catch (IOException ignored) {
-            // Không làm sập luồng chính nếu dọn dẹp thất bại
+            // Không ném lỗi vì avatar mới đã được lưu, lỗi dọn dẹp avatar cũ không nên rollback profile.
         }
     }
 
-    // --- HÀM TRỢ GIÚP (HELPER METHODS) ---
-
+    // Kiểm tra avatar có tên file hợp lệ, đúng định dạng ảnh cho phép và không vượt 5MB.
     private void validateAvatar(MultipartFile avatar) {
         String originalFileName = avatar.getOriginalFilename();
         if (originalFileName == null || !originalFileName.contains(".")) {
@@ -146,18 +146,19 @@ public class CloudinaryStorageService implements StorageService {
         }
     }
 
+    // Tách publicId từ URL Cloudinary bằng cách bỏ domain, version và đuôi mở rộng file.
     private String extractPublicId(String url) {
         if (url == null || url.isBlank() || !url.contains("upload/")) {
-            return ""; // Hoặc log cảnh báo: "URL không hợp lệ"
+            return "";
         }
 
-        // Tách lấy phần sau "upload/"
         String[] parts = url.split("upload/");
-        if (parts.length < 2) return "";
+        if (parts.length < 2) {
+            return "";
+        }
 
         String splitPart = parts[1];
 
-        // Bỏ qua version (ví dụ: v1234567/...)
         if (splitPart.startsWith("v")) {
             int firstSlash = splitPart.indexOf("/");
             if (firstSlash != -1) {
@@ -165,7 +166,6 @@ public class CloudinaryStorageService implements StorageService {
             }
         }
 
-        // Bỏ đuôi mở rộng file (.pdf, .png...)
         int lastDot = splitPart.lastIndexOf('.');
         if (lastDot != -1) {
             splitPart = splitPart.substring(0, lastDot);
@@ -174,6 +174,7 @@ public class CloudinaryStorageService implements StorageService {
         return splitPart;
     }
 
+    // Xác định resource_type Cloudinary cần dùng khi destroy/rename dựa trên URL và đuôi file.
     private String determinateResourceType(String url) {
         if (url.contains("/raw/") || url.contains(".pdf") || url.contains(".docx") || url.contains(".xlsx") || url.contains(".zip")) {
             return "raw";

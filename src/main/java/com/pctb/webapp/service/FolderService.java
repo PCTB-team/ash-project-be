@@ -27,7 +27,9 @@ public class FolderService {
 
     UserRepo userRepo;
 
+    // Tạo folder mới cho user hiện tại, có thể nằm ở root hoặc nằm trong một folder cha hợp lệ.
     @Transactional
+    // Lưu folder mới trong transaction để tránh tạo trùng hoặc lưu thiếu dữ liệu owner/parent.
     public FolderResponse createFolder(CreateFolderRequest request, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
         User owner = userRepo.findById(userId)
@@ -55,6 +57,7 @@ public class FolderService {
         return buildFolderResponse(folderRepo.save(folder));
     }
 
+    // Lấy danh sách folder active của user hiện tại theo folder cha; parent null nghĩa là lấy folder root.
     public List<FolderResponse> getMyFolders(String parentFolderId, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
         String normalizedParentFolderId = normalizeOptionalId(parentFolderId);
@@ -69,6 +72,7 @@ public class FolderService {
                 .toList();
     }
 
+    // Kiểm tra folder cha có tồn tại, đang active và thuộc đúng user hay không.
     private Folder resolveParentFolder(String parentFolderId, String userId) {
         if (parentFolderId == null) {
             return null;
@@ -78,6 +82,7 @@ public class FolderService {
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
     }
 
+    // Làm sạch tên folder, loại bỏ path client gửi kèm và kiểm tra độ dài hợp lệ.
     private String normalizeFolderName(String name) {
         String cleanName = StringUtils.cleanPath(name == null ? "" : name).trim();
         int slashIndex = Math.max(cleanName.lastIndexOf('/'), cleanName.lastIndexOf('\\'));
@@ -97,6 +102,7 @@ public class FolderService {
         return cleanName;
     }
 
+    // Chuẩn hóa id optional: chuỗi rỗng được xem như null, còn chuỗi có dữ liệu thì trim khoảng trắng.
     private String normalizeOptionalId(String id) {
         if (id == null || id.isBlank()) {
             return null;
@@ -105,6 +111,7 @@ public class FolderService {
         return id.trim();
     }
 
+    // Chuyển entity Folder sang DTO để trả về cho frontend.
     private FolderResponse buildFolderResponse(Folder folder) {
         return FolderResponse.builder()
                 .folderId(folder.getId())

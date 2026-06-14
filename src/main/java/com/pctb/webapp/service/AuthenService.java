@@ -95,6 +95,7 @@ public class AuthenService {
     long pendingRegisterTtlSeconds;
 
 // Hàm đăng kí nhận vào request
+    // Xử lý đăng ký bước đầu: validate dữ liệu, mã hóa mật khẩu, lưu pending register vào Redis và gửi OTP.
     public RegisterResponse register(RegisterRequest request) {
         // Kiểm tra xem email đã tồn tại chưa
         if (userRepo.existsByEmail(request.getEmail())) {
@@ -139,6 +140,7 @@ public class AuthenService {
     }
 
     // Hàm dùng để đăng kí login
+    // Đăng nhập bằng email hoặc username, kiểm tra mật khẩu, trạng thái verify, ghi lịch sử login và phát token.
     public LoginResponse login(LoginRequest request) {
         // lấy username hoặc email của request bỏ khoẳng trắng
         String identifier = request.getIdentifier().trim();
@@ -178,6 +180,7 @@ public class AuthenService {
     }
 
     // Dùng để tạo access token mới cần truyền vô refreshToken
+    // Tạo access token mới từ refresh token hợp lệ còn đang được lưu trong Redis.
     public LoginResponse refreshToken(RefreshTokenRequest request) {
         // Lấy refresh token
         String refreshToken = request.getRefreshToken();
@@ -220,6 +223,7 @@ public class AuthenService {
                 .build();
     }
 
+    // Test luồng refresh token bằng cách refresh access token rồi kiểm tra token mới có parse được không.
     public RefreshTokenTestResponse testNewAccessToken(RefreshTokenRequest request) {
         LoginResponse refreshedToken = refreshToken(request);
         testToken(refreshedToken.getAccessToken());
@@ -230,6 +234,7 @@ public class AuthenService {
                 .build();
     }
     // Logout truyền vào refresh token và access token
+    // Logout bằng cách xác thực access/refresh token cùng thuộc một user rồi xóa refresh token khỏi Redis.
     public LogoutResponse logout(LogoutRequest request, String accessToken) {
         // Get refreshToken
         String refreshToken = request.getRefreshToken();
@@ -278,6 +283,7 @@ public class AuthenService {
                 .build();
     }
     // Dùng để test Token
+    // Kiểm tra access hoặc refresh token và trả thông tin claim/user để hỗ trợ debug hoặc màn hình test token.
     public TokenInfoResponse testToken(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
@@ -312,6 +318,7 @@ public class AuthenService {
                 .build();
     }
     // Dùng để test Token
+    // Parse token, kiểm tra chữ ký, hạn dùng và loại token; refresh token phải khớp bản đang lưu trong Redis.
     private JWTClaimsSet parseAndValidateSupportedToken(String token, ErrorCode invalidTokenError) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
@@ -345,6 +352,7 @@ public class AuthenService {
     }
 
     // Kiểm tra token nhập vào có đúng là token được tạo ra từ hệ thôống không
+    // Parse và validate token theo loại mong đợi, ví dụ chỉ chấp nhận access hoặc chỉ chấp nhận refresh.
     private JWTClaimsSet parseAndValidateToken(String token, String expectedType, ErrorCode invalidTokenError) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
@@ -370,6 +378,7 @@ public class AuthenService {
         }
     }
 
+    // Chuyển Date trong JWT claim sang chuỗi ISO; trả null nếu claim thời gian không tồn tại.
     private String toIsoString(Date date) {
         if (date == null) {
             return null;
@@ -377,6 +386,7 @@ public class AuthenService {
         return date.toInstant().toString();
     }
 
+    // Chuyển claim bất kỳ sang String an toàn để đưa vào response test token.
     private String toClaimString(Object claim) {
         if (claim == null) {
             return null;
@@ -384,6 +394,7 @@ public class AuthenService {
         return claim.toString();
     }
     // Dùng để tạo JWT token cần truyền user, tgian tồn tại của token, và type
+    // Sinh JWT có chữ ký HS512, chứa thông tin user, scope role, loại token và thời gian hết hạn.
     private String generateToken(User user, long validSeconds, String tokenType) {
         try {
             // Thời gian hiện tại
@@ -418,6 +429,7 @@ public class AuthenService {
         }
     }
     // Record one successful login entry per user per calendar day.
+    // Ghi nhận một lần đăng nhập thành công của user trong ngày để phục vụ thống kê chuỗi ngày đăng nhập.
     private void recordSuccessfulLogin(User user) {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
@@ -432,6 +444,7 @@ public class AuthenService {
         userLoginHistoryRepo.save(history);
     }
 
+    // Tăng bộ đếm đăng nhập sai trong Redis và chặn nếu vượt giới hạn trong khung thời gian cấu hình.
     private void recordFailedLoginAttempt(String identifier) {
         String key = loginAttemptKey(identifier);
         Long attempts = redisService.increment(key);
@@ -445,25 +458,30 @@ public class AuthenService {
         }
     }
     // Clear bộ đếm login sai trong redis
+    // Xóa bộ đếm đăng nhập sai sau khi user đăng nhập thành công.
     private void clearFailedLoginAttempt(String identifier) {
         redisService.delete(loginAttemptKey(identifier));
     }
 
     // Key của email. username trong redis
+    // Tạo Redis key cho bộ đếm đăng nhập sai theo email hoặc username đã chuẩn hóa.
     private String loginAttemptKey(String identifier) {
         return "auth:login:attempts:" + identifier.toLowerCase(Locale.ROOT);
     }
     // Key của refreshtoken lưu xuống redis
+    // Tạo Redis key lưu refresh token hiện tại của user.
     private String refreshTokenKey(String userId) {
         return "auth:refresh:" + userId;
     }
     // Key của user lưu tạm xuống redis
+    // Tạo Redis key lưu thông tin đăng ký pending theo email.
     private String pendingRegisterKey(String email) {
         return "register:pending:" + email;
     }
 
 
     // Dùng để gửi otp dành cho quen mk
+    // Gửi OTP quên mật khẩu cho email đã tồn tại trong hệ thống và còn được phép gửi OTP.
     public void sendOtpForgotPassword(ForgotPasswordRequest request) {
 
         User user = userRepo.findByEmail(request.getEmail())
@@ -479,6 +497,7 @@ public class AuthenService {
         mailService.sendOtp(user.getEmail(), otp);
     }
     // Dfungf để xác thưực OTP
+    // Xác thực OTP quên mật khẩu, xóa OTP cũ và tạo reset token tạm thời lưu trong Redis.
     public String verifyOtpForgotPassword(
             VerifyForgotPasswordOtpRequest request) {
 
@@ -503,6 +522,7 @@ public class AuthenService {
         return resetToken;
     }
     // Tạo mật khẩu mởi
+    // Đổi mật khẩu mới bằng reset token hợp lệ, sau đó xóa reset token để không dùng lại được.
     public void resetPassword(
             ResetPasswordRequest request) {
 
@@ -538,10 +558,12 @@ public class AuthenService {
         redisService.delete(resetTokenKey(request.getResetToken()));
     }
     // Dùng để gửi lại otp khi queên mật khẩu
+    // Gửi lại OTP quên mật khẩu bằng cách dùng chung logic gửi OTP ban đầu.
     public void resendForgotPasswordOtp(ForgotPasswordRequest request) {
         sendOtpForgotPassword(request);
     }
     // Dùng để kiêm tra token của google
+    // Xác thực Google ID token với client id cấu hình và yêu cầu email Google đã verified.
     private GoogleIdToken.Payload verifyGoogleToken(String token) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
@@ -569,6 +591,7 @@ public class AuthenService {
         }
     }
     // tạo username mới khi đăng nhập bằng google
+    // Sinh username từ phần trước @ của email Google và thêm số nếu username đã tồn tại.
     private String generateGoogleUsername(String email) {
         String baseUsername = email.substring(0, email.indexOf("@"))
                 .replaceAll("[^a-zA-Z0-9]", "");
@@ -595,15 +618,18 @@ public class AuthenService {
         return username;
     }
 
+    // Tạo Redis key lưu OTP cho luồng quên mật khẩu.
     private String forgotOtpKey(String email) {
         return OTP_FORGOT_PREFIX + email;
     }
 
+    // Tạo Redis key ánh xạ reset token sang email đang được phép đặt lại mật khẩu.
     private String resetTokenKey(String resetToken) {
         return RESET_TOKEN_PREFIX + resetToken;
     }
 
     // Tạo user mới khi đăng nhập bằng google
+    // Tạo user mới từ thông tin Google khi email chưa tồn tại trong hệ thống.
     private User createGoogleUser(String email, String fullname) {
         Role userRole = roleRepo.findById(RoleEnum.USER.name())
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
@@ -620,6 +646,7 @@ public class AuthenService {
         return userRepo.save(user);
     }
     // Login bằng tài khoản google
+    // Đăng nhập bằng Google: verify token, tạo user nếu cần, ghi nhận login và phát access/refresh token.
     public LoginResponse googleLogin(GoogleLoginRequest request) {
         GoogleIdToken.Payload payload = verifyGoogleToken(request.getToken());
 

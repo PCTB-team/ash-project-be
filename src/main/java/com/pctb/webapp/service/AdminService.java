@@ -29,7 +29,7 @@ public class AdminService {
     UserRepo userRepo;
     SystemLogRepo systemLogRepo;
 
-    // 1. Xem danh sách & Tìm kiếm User nâng cao kết hợp phân trang
+    // Lấy danh sách user có phân trang; nếu có keyword thì tìm theo username, email hoặc fullname.
     public Page<UserResponse> getAllAndSearchUsers(String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<User> usersPage = (keyword == null || keyword.trim().isEmpty())
@@ -39,8 +39,9 @@ public class AdminService {
         return usersPage.map(this::mapToUserResponse);
     }
 
-    // 2. Logic Khóa User kèm Ghi vết Lý do (Business Rules)
+    // Khóa tài khoản user, lưu lý do khóa và ghi log hệ thống để admin có lịch sử thao tác.
     @Transactional
+    // Thực hiện khóa user trong một transaction để trạng thái khóa và system log được lưu nhất quán.
     public void lockUser(String userId, LockUserRequest request, String adminUsername) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -55,7 +56,6 @@ public class AdminService {
         user.setLockedByAdmin(adminUsername);
         userRepo.save(user);
 
-        // Lưu vết nhật ký hệ thống bằng TIẾNG VIỆT
         SystemLog log = SystemLog.builder()
                 .actor(adminUsername)
                 .action("LOCK_USER")
@@ -65,8 +65,9 @@ public class AdminService {
         systemLogRepo.save(log);
     }
 
-    // 3. Logic Mở Khóa User
+    // Mở khóa tài khoản user, xóa thông tin khóa cũ và ghi log thao tác mở khóa.
     @Transactional
+    // Thực hiện mở khóa user trong một transaction để cập nhật user và ghi log cùng thành công.
     public void unlockUser(String userId, String adminUsername) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -81,7 +82,6 @@ public class AdminService {
         user.setLockedByAdmin(null);
         userRepo.save(user);
 
-        // Lưu vết nhật ký hệ thống bằng TIẾNG VIỆT
         SystemLog log = SystemLog.builder()
                 .actor(adminUsername)
                 .action("UNLOCK_USER")
@@ -91,13 +91,13 @@ public class AdminService {
         systemLogRepo.save(log);
     }
 
-    // 4. Quản lý Nhật ký hệ thống (System Logs)
+    // Lấy nhật ký hệ thống theo phân trang, sắp xếp theo thứ tự mới nhất ở repository.
     public Page<SystemLog> getSystemLogs(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         return systemLogRepo.findAllByOrderByCreatedAtDesc(pageable);
     }
 
-    // 5. Thống kê hệ thống đơn giản (Dashboard Stats)
+    // Trả về thống kê hệ thống đơn giản gồm tổng số user và thời điểm tạo thống kê.
     public Map<String, Object> getSystemStats() {
         long totalUsers = userRepo.count();
         Map<String, Object> stats = new HashMap<>();
@@ -106,6 +106,7 @@ public class AdminService {
         return stats;
     }
 
+    // Chuyển entity User sang DTO trả về cho màn hình quản trị, chỉ lấy các field cần hiển thị.
     private UserResponse mapToUserResponse(User user) {
         UserResponse response = new UserResponse();
         response.setId(user.getId());
@@ -122,10 +123,10 @@ public class AdminService {
         return response;
     }
 
+    // Tạo dữ liệu dashboard gồm tổng user và số user mới trong 7 ngày, 2 tuần, 1 tháng gần nhất.
     public DashboardStatsResponse getDashboardStats() {
         LocalDateTime now = LocalDateTime.now();
 
-        // Tính toán mốc thời gian
         Map<String, Long> growth = new HashMap<>();
         growth.put("last7Days", userRepo.countByCreatedAtAfter(now.minusDays(7)));
         growth.put("last2Weeks", userRepo.countByCreatedAtAfter(now.minusDays(14)));

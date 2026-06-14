@@ -62,4 +62,14 @@ public class User {
     @Column(name = "locked_by_admin")
     String lockedByAdmin; // Lưu username hoặc ID của Admin thực hiện
 
+    @Column(name = "created_at", updatable = false)
+    LocalDateTime createdAt;
+
+    @PrePersist
+    void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
 }

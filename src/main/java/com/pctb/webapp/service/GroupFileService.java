@@ -1,6 +1,5 @@
 package com.pctb.webapp.service;
 
-import com.pctb.webapp.ai.service.DocumentIngestionService;
 import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.entity.GroupFile;
 import com.pctb.webapp.entity.GroupMember;
@@ -43,13 +42,13 @@ public class GroupFileService {
 
     StorageService storageService;
 
-    DocumentIngestionService documentIngestionService;
-
     /**
      * Upload file vao group.
      * User phai la member APPROVED va canUpload=true moi duoc upload.
      */
+    // Upload file vào group sau khi kiểm tra user là member đã được duyệt và có quyền upload.
     @Transactional
+    // Lưu file group trong transaction để record GroupFile và quyền truy cập được xử lý nhất quán.
     public GroupFileResponse uploadFile(
             String groupId,
             MultipartFile file,
@@ -78,7 +77,6 @@ public class GroupFileService {
                 .build();
 
         groupFile = groupFileRepo.save(groupFile);
-        documentIngestionService.ingestGroupFile(group.getId(), groupFile.getId());
 
         return buildGroupFileResponse(groupFile);
     }
@@ -86,7 +84,9 @@ public class GroupFileService {
     /**
      * Alias cho API /documents de frontend goi dung ngon ngu tai lieu trong group.
      */
+    // Alias cho uploadFile để frontend có thể gọi theo ngữ cảnh "document" trong group.
     @Transactional
+    // Gọi lại uploadFile để dùng chung toàn bộ rule upload tài liệu trong group.
     public GroupFileResponse uploadDocument(
             String groupId,
             MultipartFile file,
@@ -99,7 +99,9 @@ public class GroupFileService {
      * Lay danh sach file trong group.
      * Chi member APPROVED moi duoc xem file cua group.
      */
+    // Lấy danh sách file active trong group, chỉ cho phép member đã được duyệt truy cập.
     @Transactional
+    // Kiểm tra quyền xem group trước khi trả danh sách file chưa bị xóa.
     public List<GroupFileResponse> getGroupFiles(
             String groupId,
             JwtAuthenticationToken authentication
@@ -116,7 +118,9 @@ public class GroupFileService {
     /**
      * Alias cho API /documents, chi tra file active chua bi dua vao trash.
      */
+    // Alias cho getGroupFiles, trả về các document đang active trong group.
     @Transactional
+    // Gọi lại getGroupFiles để giữ cùng một logic kiểm tra quyền và map response.
     public List<GroupFileResponse> getActiveDocuments(
             String groupId,
             JwtAuthenticationToken authentication
@@ -128,7 +132,9 @@ public class GroupFileService {
      * Leader dua document vao trash.
      * Khong xoa vat ly file/database de con restore lai duoc.
      */
+    // Đưa document vào thùng rác của group bằng soft delete, chỉ leader được thực hiện.
     @Transactional
+    // Soft delete file group bằng cờ deleted để có thể restore sau này.
     public void moveDocumentToTrash(
             String groupId,
             String documentId,
@@ -150,7 +156,9 @@ public class GroupFileService {
     /**
      * Leader xem danh sach document dang nam trong trash cua group.
      */
+    // Lấy danh sách document đang nằm trong thùng rác của group, chỉ leader được xem.
     @Transactional
+    // Kiểm tra quyền leader rồi trả các file đã bị soft delete.
     public List<GroupFileResponse> getTrashDocuments(
             String groupId,
             JwtAuthenticationToken authentication
@@ -167,7 +175,9 @@ public class GroupFileService {
     /**
      * Leader restore document tu trash ve danh sach active.
      */
+    // Khôi phục document từ thùng rác về trạng thái active, chỉ leader được thực hiện.
     @Transactional
+    // Chuyển file từ deleted=true về deleted=false và xóa thời điểm deletedAt.
     public GroupFileResponse restoreDocument(
             String groupId,
             String documentId,
@@ -191,6 +201,7 @@ public class GroupFileService {
      * Lay current user tu JWT.
      * authentication.getName() la userId trong project nay.
      */
+    // Lấy user hiện tại từ JWT token; trong project này subject/name của token là userId.
     private User getCurrentUser(JwtAuthenticationToken authentication) {
         return userRepo.findById(authentication.getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -199,6 +210,7 @@ public class GroupFileService {
     /**
      * Check user da duoc duyet vao group va co quyen upload file.
      */
+    // Kiểm tra user là member approved và có quyền upload file trong group.
     private GroupMember requireUploadPermission(String groupId, User currentUser) {
         GroupMember member = requireApprovedMember(groupId, currentUser);
         if (!Boolean.TRUE.equals(member.getCanUpload())) {
@@ -212,6 +224,7 @@ public class GroupFileService {
      * Check user la member APPROVED cua group.
      * PENDING/REJECTED/LEFT/BANNED deu khong duoc xem/upload file group.
      */
+    // Kiểm tra user là member đã được duyệt; tự đồng bộ owner thành leader nếu dữ liệu cũ bị thiếu membership.
     private GroupMember requireApprovedMember(String groupId, User currentUser) {
         StudyGroup group = studyGroupRepo.findById(normalizeRequiredText(groupId))
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
@@ -242,6 +255,7 @@ public class GroupFileService {
     /**
      * Check current user la LEADER APPROVED trong group.
      */
+    // Kiểm tra user hiện tại có vai trò LEADER trong group hay không.
     private GroupMember requireLeader(String groupId, User currentUser) {
         GroupMember member = requireApprovedMember(groupId, currentUser);
         if (member.getRole() != GroupRole.LEADER) {
@@ -254,6 +268,7 @@ public class GroupFileService {
     /**
      * Tim file theo documentId va dam bao file thuoc dung group dang thao tac.
      */
+    // Tìm file theo documentId và đảm bảo file đó thuộc đúng group trong request.
     private GroupFile getFileInGroup(String groupId, String documentId) {
         GroupFile groupFile = groupFileRepo.findById(normalizeRequiredText(documentId))
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_FILE_NOT_FOUND));
@@ -268,6 +283,7 @@ public class GroupFileService {
     /**
      * Tao membership LEADER cho owner neu group cu chua co record membership.
      */
+    // Tạo membership LEADER cho owner khi dữ liệu group cũ chưa có record membership tương ứng.
     private GroupMember createOwnerLeaderMembership(StudyGroup group, User owner) {
         GroupMember member = GroupMember.builder()
                 .group(group)
@@ -284,6 +300,7 @@ public class GroupFileService {
     /**
      * Dong bo membership cua owner thanh LEADER APPROVED de khong bi mat quyen voi data cu.
      */
+    // Đồng bộ membership của owner thành LEADER và APPROVED để owner không mất quyền với dữ liệu cũ.
     private GroupMember syncOwnerLeaderMembership(GroupMember member) {
         member.setRole(GroupRole.LEADER);
         member.setJoinStatus(JoinStatus.APPROVED);
@@ -298,6 +315,7 @@ public class GroupFileService {
     /**
      * Lam sach ten file goc de tranh client gui kem path.
      */
+    // Làm sạch tên file gốc, loại bỏ đường dẫn client gửi kèm và chặn tên file rỗng.
     private String cleanOriginalFileName(String originalFileName) {
         String cleanPath = StringUtils.cleanPath(originalFileName == null ? "" : originalFileName);
         int slashIndex = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
@@ -316,6 +334,7 @@ public class GroupFileService {
     /**
      * Tao path luu file group trong local storage.
      */
+    // Tạo tên/path lưu file group bằng groupId và UUID để tránh trùng file vật lý.
     private String buildStoredFileName(String groupId, String extension) {
         return "groups/" + groupId + "/files/" + UUID.randomUUID() + "." + extension;
     }
@@ -323,6 +342,7 @@ public class GroupFileService {
     /**
      * Convert GroupFile entity sang DTO tra ve FE.
      */
+    // Chuyển entity GroupFile sang DTO để frontend nhận dữ liệu gọn và ổn định.
     private GroupFileResponse buildGroupFileResponse(GroupFile groupFile) {
         return GroupFileResponse.builder()
                 .fileId(groupFile.getId())
@@ -340,6 +360,7 @@ public class GroupFileService {
     /**
      * Chuan hoa id bat buoc trong path variable.
      */
+    // Chuẩn hóa text bắt buộc; nếu null hoặc rỗng thì ném lỗi request không hợp lệ.
     private String normalizeRequiredText(String value) {
         if (value == null || value.isBlank()) {
             throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);

@@ -65,7 +65,7 @@ public class AdminController {
     }
 
     // Xem thống kê hệ thống (Dashboard Stats)
-    @GetMapping("/dashboard/stats")
+    @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
         return ResponseEntity.ok(adminService.getSystemStats());
     }

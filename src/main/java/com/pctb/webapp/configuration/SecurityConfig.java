@@ -65,7 +65,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/groups/invite/**").permitAll()
-                        .requestMatchers("/ai/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/groups/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/documents/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/folders/**").hasAnyRole("USER", "ADMIN")

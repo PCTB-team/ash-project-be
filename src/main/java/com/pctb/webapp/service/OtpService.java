@@ -44,22 +44,20 @@ public class OtpService {
     @Value("${app.otp.limit-ttl-seconds}")
     long limitTtlSeconds;
 
-    // Gửi otp sau khi đăng kí
+    // Tạo OTP mới sau bước đăng ký, lưu OTP vào Redis có TTL, đánh dấu cooldown và gửi email cho user.
     public void sendOtpAfterRegister(String email) {
-        validateOtpSendAvailable(email);//kiểm tra xem email đó đã gửi quá 5 lần hay đang trong cooldown chưa
+        validateOtpSendAvailable(email);
 
         String otp = generateOtp();
-        // lưu otp xuống redis
         redisService.setWithTtl(otpKey(email), otp, otpTtlSeconds);
         markOtpSent(email);
 
-        // gửi mail
         mailService.sendOtp(email, otp);
 
         System.out.println("OTP for " + email + ": " + otp);
     }
 
-    // ResendOtp
+    // Gửi lại OTP cho email đang có phiên đăng ký pending và chưa được verify thành tài khoản thật.
     public OtpResponse resendOtp(String email) {
         if (userRepo.existsByEmail(email)) {
             throw new AppException(ErrorCode.ACCOUNT_ALREADY_VERIFIED);
@@ -76,36 +74,30 @@ public class OtpService {
                 .email(email)
                 .build();
     }
-    // Xác thực otp
+
+    // Xác thực OTP đăng ký, đọc thông tin pending từ Redis, tạo user thật trong DB và xóa các key tạm.
     public OtpResponse verifyOtp(String email, String otp) {
-
-
-
-        // Lấy value JSON từ redis
         String pendingJson = redisService.get(registerKey(email));
         if (pendingJson == null) {
             throw new AppException(ErrorCode.REGISTER_SESSION_EXPIRED);
         }
-        // lấy otp đã save từ redis
+
         String savedOtp = redisService.get(otpKey(email));
-        // Nếu không có trong redis thì tức là đã hết hạn
         if (savedOtp == null) {
             throw new AppException(ErrorCode.OTP_EXPIRED);
         }
-        // Nếu nhập sai otp thì ném ra là sai
+
         if (!savedOtp.equals(otp)) {
             throw new AppException(ErrorCode.OTP_INVALID);
         }
 
-
         PendingRegisterRequest pending;
-        // Chuyển JSON thanhf object
         try {
             pending = objectMapper.readValue(pendingJson, PendingRegisterRequest.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-        // Phải ktra lại vì nếu trong khoản tgian đợi verify otp thì có người khác đã đăng kí thành công cùng 1 giá trij rồi
+
         if (userRepo.existsByEmail(pending.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
@@ -113,13 +105,12 @@ public class OtpService {
         if (userRepo.existsByUsername(pending.getUsername())) {
             throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }
-        // Kiểm tra coi dưới DB đã có role USER chưa nếu chưa thì tạo
+
         Role userRole = roleRepo.findById(RoleEnum.USER.name())
                 .orElseGet(() -> roleRepo.save(
                         new Role(RoleEnum.USER.name(), "User role")
                 ));
 
-        // Tạo user và lưu xuống DB
         User user = User.builder()
                 .username(pending.getUsername())
                 .email(pending.getEmail())
@@ -131,11 +122,9 @@ public class OtpService {
 
         userRepo.save(user);
 
-        // Sau khi hoàn tất thì hủy hết toàn bộ key liên quan tới email đó
         redisService.delete(otpKey(email));
         redisService.delete(cooldownKey(email));
         redisService.delete(registerKey(email));
-
 
         return OtpResponse.builder()
                 .email(user.getEmail())
@@ -143,18 +132,19 @@ public class OtpService {
                 .build();
     }
 
-
-    // Kiểm tra xem số lần gửi otp của email đó có việc qua 5 lần trên ngày không
+    // Kiểm tra email có được phép gửi OTP tại thời điểm hiện tại hay không, gồm giới hạn ngày và cooldown.
     public void validateOtpSendAvailable(String email) {
         checkLimit(email);
         checkCooldown(email);
     }
 
+    // Đánh dấu một lần gửi OTP vừa xảy ra bằng cách tạo cooldown key và tăng bộ đếm gửi trong ngày.
     public void markOtpSent(String email) {
         redisService.setWithTtl(cooldownKey(email), "1", resendCooldownSeconds);
         increaseLimit(email);
     }
 
+    // Kiểm tra số lần gửi OTP trong ngày của email có vượt quá giới hạn cấu hình hay chưa.
     private void checkLimit(String email) {
         String current = redisService.get(limitKey(email));
 
@@ -163,12 +153,14 @@ public class OtpService {
         }
     }
 
+    // Kiểm tra email có đang trong thời gian cooldown chưa được gửi lại OTP hay không.
     private void checkCooldown(String email) {
         if (redisService.get(cooldownKey(email)) != null) {
             throw new AppException(ErrorCode.OTP_RESEND_TOO_SOON);
         }
     }
-    // tăng số lần của email mỗi lần gọi
+
+    // Tăng bộ đếm số lần gửi OTP và gán TTL cho key ở lần tăng đầu tiên.
     private void increaseLimit(String email) {
         String key = limitKey(email);
         Long count = redisService.increment(key);
@@ -177,23 +169,29 @@ public class OtpService {
             redisService.expire(key, limitTtlSeconds);
         }
     }
+
+    // Tạo Redis key lưu thông tin đăng ký pending theo email.
     private String registerKey(String email) {
         return "register:pending:" + email;
     }
-    // Tạo otp
+
+    // Sinh mã OTP 6 chữ số bằng SecureRandom để dùng cho xác thực email.
     public String generateOtp() {
         int otp = secureRandom.nextInt(900000) + 100000;
         return String.valueOf(otp);
     }
 
+    // Tạo Redis key đếm số lần gửi OTP trong ngày theo email.
     private String limitKey(String email) {
         return "otp:limit:" + email;
     }
 
+    // Tạo Redis key lưu OTP hiện tại của email.
     private String otpKey(String email) {
         return "otp:" + email;
     }
 
+    // Tạo Redis key cooldown để chặn gửi lại OTP quá nhanh.
     private String cooldownKey(String email) {
         return "otp:cooldown:" + email;
     }
