@@ -8,6 +8,7 @@ import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupStatisticsResponse;
+import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
 import com.pctb.webapp.entity.StudyGroup;
@@ -30,7 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -85,6 +89,35 @@ public class GroupService {
         groupMemberRepo.save(leaderMember);
 
         return buildCreateGroupResponse(savedGroup);
+    }
+
+    /**
+     * Lay cac group ma user dang dang nhap dang tham gia hoac dang lam leader.
+     */
+    @Transactional(readOnly = true)
+    public List<GroupSummaryResponse> getMyGroups(
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        List<GroupSummaryResponse> responses = new ArrayList<>();
+        Set<String> addedGroupIds = new HashSet<>();
+
+        groupMemberRepo.findByUserIdOrderByJoinedAtDesc(currentUser.getId())
+                .forEach(member -> {
+                    StudyGroup group = member.getGroup();
+                    if (addedGroupIds.add(group.getId())) {
+                        responses.add(buildGroupSummaryResponse(group, member, currentUser));
+                    }
+                });
+
+        studyGroupRepo.findByOwnerIdOrderByCreatedAtDesc(currentUser.getId())
+                .forEach(group -> {
+                    if (addedGroupIds.add(group.getId())) {
+                        responses.add(buildGroupSummaryResponse(group, null, currentUser));
+                    }
+                });
+
+        return responses;
     }
 
     @Transactional(readOnly = true)
@@ -356,6 +389,36 @@ public class GroupService {
                 .groupId(group.getId())
                 .name(group.getName())
                 .inviteLink(buildInviteLink(group.getInviteToken()))
+                .build();
+    }
+
+    /**
+     * Dong goi thong tin group gon cho danh sach "Group cua toi".
+     */
+    private GroupSummaryResponse buildGroupSummaryResponse(
+            StudyGroup group,
+            GroupMember member,
+            User currentUser
+    ) {
+        boolean isLeader = group.getOwner().getId().equals(currentUser.getId())
+                || (member != null && member.getRole() == GroupRole.LEADER);
+        String role = isLeader ? GroupRole.LEADER.name() : member.getRole().name();
+
+        return GroupSummaryResponse.builder()
+                .groupId(group.getId())
+                .name(group.getName())
+                .description(group.getDescription())
+                .ownerId(group.getOwner().getId())
+                .ownerName(group.getOwner().getFullname())
+                .memberId(member == null ? null : member.getId())
+                .role(role)
+                .canUpload(isLeader || (member != null && Boolean.TRUE.equals(member.getCanUpload())))
+                .inviteEnabled(group.getInviteEnabled())
+                .inviteLink(isLeader ? buildInviteLink(group.getInviteToken()) : null)
+                .memberCount(groupMemberRepo.countByGroupId(group.getId()))
+                .activeFileCount(groupFileRepo.countByGroupIdAndDeletedFalse(group.getId()))
+                .createdAt(group.getCreatedAt() == null ? null : group.getCreatedAt().toString())
+                .updatedAt(group.getUpdatedAt() == null ? null : group.getUpdatedAt().toString())
                 .build();
     }
 
