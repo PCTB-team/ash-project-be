@@ -10,13 +10,13 @@ import org.springframework.context.annotation.Configuration;
 public class CloudinaryConfig {
 
     // Điền đúng tên cloud của bạn là testcloud từ file application.properties
-    @Value("${app.cloudinary.cloud-name:dyvwr1u7e}")
+    @Value("${app.cloudinary.cloud-name}")
     private String cloudName;
 
-    @Value("${app.cloudinary.api-key:295667836828874}")
+    @Value("${app.cloudinary.api-key}")
     private String apiKey;
 
-    @Value("${app.cloudinary.api-secret:z-A_n1X3XDrTSXY1oKWdTjzL6pw}")
+    @Value("${app.cloudinary.api-secret}")
     private String apiSecret;
 
     @Bean

@@ -71,7 +71,7 @@ public class SecurityConfig {
                         // Profile chỉ yêu cầu đăng nhập, khác với GET /user cần ADMIN.
                         .requestMatchers(HttpMethod.GET, "/user/profile").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/user/profile").authenticated()
-                        .requestMatchers("/user").hasRole("ADMIN")
+                        .requestMatchers("/admin/users").hasRole("ADMIN")
                         .anyRequest().authenticated()
 
 
