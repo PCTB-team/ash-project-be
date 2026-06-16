@@ -9,6 +9,7 @@ import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupStatisticsResponse;
+import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.service.GroupService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/groups")
@@ -44,6 +47,21 @@ public class GroupController {
         return ApiResponse.<CreateGroupResponse>builder()
                 .message("Create group successfully")
                 .result(groupService.createGroup(request, authentication))
+                .build();
+    }
+
+    /**
+     * Lay danh sach group cua user dang dang nhap.
+     * FE dung API nay de render man hinh "Group cua toi".
+     */
+    @Operation(summary = "Get my groups")
+    @GetMapping("/my")
+    public ApiResponse<List<GroupSummaryResponse>> getMyGroups(
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<List<GroupSummaryResponse>>builder()
+                .message("Get my groups successfully")
+                .result(groupService.getMyGroups(authentication))
                 .build();
     }
 
