@@ -59,7 +59,7 @@ public class SecurityConfig {
                                 "/auth/otp-verification",
                                 "/set-with-ttl",
                                 "/increment").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/auth/logout","/ai/chat").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
                         // Cho phép FE load avatar đã upload mà không cần quyền ADMIN.
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
