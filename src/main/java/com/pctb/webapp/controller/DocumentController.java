@@ -60,6 +60,21 @@ public class DocumentController {
                 .build();
     }
 
+    @Operation(summary = "Search current user documents by file name")
+    @GetMapping("/search")
+    public ApiResponse<Page<DocumentResponse>> searchMyDocuments(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "folderId", required = false) String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<Page<DocumentResponse>>builder()
+                .message("Search documents successfully")
+                .result(documentService.searchMyDocuments(authentication, keyword, page, size, folderId))
+                .build();
+    }
+
     @Operation(summary = "Filter current user documents by file type")
     @GetMapping("/filter")
     public ApiResponse<FilteredDocumentResponse> filterMyDocumentsByFileType(
