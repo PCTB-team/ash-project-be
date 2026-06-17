@@ -81,6 +81,32 @@ public class DocumentService {
                 .map(this::buildDocumentResponse);
     }
 
+    public Page<DocumentResponse> searchMyDocuments(
+            JwtAuthenticationToken authentication,
+            String keyword,
+            int page,
+            int size,
+            String folderId
+    ) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        String normalizedKeyword = normalizeOptionalKeyword(keyword);
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+
+        if (normalizedFolderId != null) {
+            resolveFolder(normalizedFolderId, userId);
+        }
+
+        return documentRepo.searchActiveByOwnerIdAndFileName(
+                        userId,
+                        normalizedFolderId,
+                        normalizedKeyword,
+                        PageRequest.of(normalizedPage, normalizedSize)
+                )
+                .map(this::buildDocumentResponse);
+    }
+
     // Lọc tài liệu của user theo nhóm loại file như document, image, audio, video hoặc presentation.
     public FilteredDocumentResponse filterMyDocumentsByFileType(
             JwtAuthenticationToken authentication,
@@ -360,6 +386,14 @@ public class DocumentService {
         }
 
         return id.trim();
+    }
+
+    private String normalizeOptionalKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+
+        return keyword.trim();
     }
 
     // Chuyển fileType từ request thành danh sách extension tương ứng để query database.

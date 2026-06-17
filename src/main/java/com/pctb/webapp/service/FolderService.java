@@ -2,10 +2,12 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.CreateFolderRequest;
 import com.pctb.webapp.dto.response.FolderResponse;
+import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
@@ -24,6 +26,10 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FolderService {
     FolderRepo folderRepo;
+
+    DocumentRepo documentRepo;
+
+    StorageService storageService;
 
     UserRepo userRepo;
 
@@ -73,6 +79,90 @@ public class FolderService {
     }
 
     // Kiểm tra folder cha có tồn tại, đang active và thuộc đúng user hay không.
+    @Transactional
+    public FolderResponse deleteMyFolder(String folderId, JwtAuthenticationToken authentication) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        if (normalizedFolderId == null) {
+            throw new AppException(ErrorCode.FOLDER_NOT_FOUND);
+        }
+
+        Folder folder = folderRepo.findActiveByIdAndOwnerId(normalizedFolderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
+
+        LocalDateTime deletedAt = LocalDateTime.now();
+        long removedSize = folder.getSize() == null ? 0 : folder.getSize();
+
+        moveFolderTreeToTrash(folder, userId, deletedAt);
+        updateParentSizeCascade(folder.getParent(), -removedSize, deletedAt);
+
+        return buildFolderResponse(folder);
+    }
+
+    private void moveFolderTreeToTrash(Folder folder, String userId, LocalDateTime deletedAt) {
+        List<Document> documents = documentRepo.findActiveFilesByOwnerIdAndFolderId(userId, folder.getId());
+        for (Document document : documents) {
+            document.setDeleted(true);
+            document.setDeletedAt(deletedAt);
+            document.setUpdatedAt(deletedAt);
+            documentRepo.save(document);
+        }
+
+        List<Folder> childFolders = folderRepo.findActiveByOwnerIdAndParentId(userId, folder.getId());
+        for (Folder childFolder : childFolders) {
+            moveFolderTreeToTrash(childFolder, userId, deletedAt);
+        }
+
+        folder.setDeleted(true);
+        folder.setDeletedAt(deletedAt);
+        folder.setUpdatedAt(deletedAt);
+        folderRepo.save(folder);
+    }
+
+    private void updateParentSizeCascade(Folder folder, long delta, LocalDateTime updatedAt) {
+        Folder current = folder;
+
+        while (current != null) {
+            long currentSize = current.getSize() == null ? 0 : current.getSize();
+            current.setSize(Math.max(0, currentSize + delta));
+            current.setUpdatedAt(updatedAt);
+            folderRepo.save(current);
+            current = current.getParent();
+        }
+    }
+
+    @Transactional
+    public FolderResponse deleteMyFolderPermanently(String folderId, JwtAuthenticationToken authentication) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        if (normalizedFolderId == null) {
+            throw new AppException(ErrorCode.FOLDER_NOT_FOUND);
+        }
+
+        Folder folder = folderRepo.findTrashByIdAndOwnerId(normalizedFolderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
+        FolderResponse response = buildFolderResponse(folder);
+
+        deleteFolderTreePermanently(folder, userId);
+
+        return response;
+    }
+
+    private void deleteFolderTreePermanently(Folder folder, String userId) {
+        List<Folder> childFolders = folderRepo.findByOwnerIdAndParentId(userId, folder.getId());
+        for (Folder childFolder : childFolders) {
+            deleteFolderTreePermanently(childFolder, userId);
+        }
+
+        List<Document> documents = documentRepo.findByOwnerIdAndFolderId(userId, folder.getId());
+        for (Document document : documents) {
+            storageService.delete(document.getStorageUrl());
+            documentRepo.delete(document);
+        }
+
+        folderRepo.delete(folder);
+    }
+
     private Folder resolveParentFolder(String parentFolderId, String userId) {
         if (parentFolderId == null) {
             return null;

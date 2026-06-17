@@ -3,6 +3,7 @@ package com.pctb.webapp.service;
 import com.pctb.webapp.dto.request.UpdateProfileRequest;
 import com.pctb.webapp.dto.response.UserProfileResponse;
 import com.pctb.webapp.dto.response.UserResponse;
+import com.pctb.webapp.dto.response.UserStorageResponse;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
@@ -13,6 +14,8 @@ import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +33,10 @@ public class UserService {
     CloudinaryStorageService CloudinaryStorageService;
     PasswordEncoder passwordEncoder;
 
+    @Value("${app.upload.max-user-storage}")
+    @NonFinal
+    long maxUserStorage;
+
     // Lấy toàn bộ user trong hệ thống và chuyển sang DTO để tránh trả trực tiếp entity.
     public List<UserResponse> getUser() {
         return userMapper.toUserResponseList(userRepo.findAll());
@@ -41,6 +48,25 @@ public class UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         return buildUserProfileResponse(user);
+    }
+
+    public UserStorageResponse getStorage(String userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Long usedStorageResult = documentRepo.sumFileSizeByOwner(user);
+        long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
+        long remainingStorage = Math.max(0, maxUserStorage - usedStorage);
+        double usagePercent = maxUserStorage <= 0
+                ? 0
+                : Math.round(usedStorage * 10000.0 / maxUserStorage) / 100.0;
+
+        return UserStorageResponse.builder()
+                .usedStorage(usedStorage)
+                .maxStorage(maxUserStorage)
+                .remainingStorage(remainingStorage)
+                .usagePercent(usagePercent)
+                .build();
     }
 
     // Cập nhật profile gồm fullname, school, avatar và mật khẩu nếu người dùng có yêu cầu đổi mật khẩu.

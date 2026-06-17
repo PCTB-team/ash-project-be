@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.request.UpdateProfileRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.UserProfileResponse;
 import com.pctb.webapp.dto.response.UserResponse;
+import com.pctb.webapp.dto.response.UserStorageResponse;
 import com.pctb.webapp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -50,6 +51,19 @@ public class UserController {
         return ApiResponse.<UserProfileResponse>builder()
                 .message("Get profile successfully")
                 .result(userService.getProfile(userId))
+                .build();
+    }
+
+    @Operation(summary = "Get current user storage usage")
+    @GetMapping("/storage")
+    public ApiResponse<UserStorageResponse> getStorage(
+            @Parameter(hidden = true) JwtAuthenticationToken authentication
+    ) {
+        String userId = authentication.getToken().getSubject();
+
+        return ApiResponse.<UserStorageResponse>builder()
+                .message("Get storage usage successfully")
+                .result(userService.getStorage(userId))
                 .build();
     }
 

@@ -70,6 +70,36 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
     )
     Page<Document> findActiveByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId, Pageable pageable);
 
+    @Query("select d from Document d where d.owner.id = :ownerId and d.folder.id = :folderId and (d.deleted = false or d.deleted is null)")
+    List<Document> findActiveFilesByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId);
+
+    @Query("select d from Document d where d.owner.id = :ownerId and d.folder.id = :folderId")
+    List<Document> findByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId);
+
+    @Query(
+            value = """
+                    select d from Document d
+                    where d.owner.id = :ownerId
+                      and (:folderId is null or d.folder.id = :folderId)
+                      and (:keyword is null or lower(d.fileName) like lower(concat('%', :keyword, '%')))
+                      and (d.deleted = false or d.deleted is null)
+                    order by d.createdAt desc
+                    """,
+            countQuery = """
+                    select count(d) from Document d
+                    where d.owner.id = :ownerId
+                      and (:folderId is null or d.folder.id = :folderId)
+                      and (:keyword is null or lower(d.fileName) like lower(concat('%', :keyword, '%')))
+                      and (d.deleted = false or d.deleted is null)
+                    """
+    )
+    Page<Document> searchActiveByOwnerIdAndFileName(
+            @Param("ownerId") String ownerId,
+            @Param("folderId") String folderId,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     @Query("select d from Document d where d.owner.id = :ownerId and d.fileName = :fileName and ((:folderId is null and d.folder is null) or d.folder.id = :folderId)")
     Optional<Document> findByOwnerIdAndFolderIdAndFileName(@Param("ownerId") String ownerId, @Param("folderId") String folderId, @Param("fileName") String fileName);
 
