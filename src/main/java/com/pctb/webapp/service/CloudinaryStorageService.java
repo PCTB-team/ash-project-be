@@ -14,9 +14,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -115,9 +118,9 @@ public class CloudinaryStorageService implements StorageService {
 
         try {
             Map params = ObjectUtils.asMap(
-                    "public_id", "avatars/" + userId,
+                    "public_id", "avatars/" + userId + "/" + UUID.randomUUID(),
                     "resource_type", "image",
-                    "overwrite", true
+                    "invalidate", true
             );
             Map uploadResult = cloudinary.uploader().upload(avatar.getBytes(), params);
             return (String) uploadResult.get("secure_url");
@@ -133,9 +136,62 @@ public class CloudinaryStorageService implements StorageService {
         }
         try {
             String publicId = extractPublicId(avatarUrl);
-            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", "image"));
-        } catch (IOException ignored) {
-            // Không ném lỗi vì avatar mới đã được lưu, lỗi dọn dẹp avatar cũ không nên rollback profile.
+            if (publicId.isBlank()) {
+                return;
+            }
+            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", "image", "invalidate", true));
+        } catch (Exception exception) {
+            throw new AppException(ErrorCode.AVATAR_UPLOAD_FAILED);
+        }
+    }
+
+    // Delete stale Cloudinary avatar assets for this user, keeping only the current DB avatar.
+    public void deleteOldAvatars(String userId, String currentAvatarUrl) {
+        if (userId == null || userId.isBlank() || currentAvatarUrl == null || currentAvatarUrl.isBlank()) {
+            return;
+        }
+
+        String currentPublicId = extractPublicId(currentAvatarUrl);
+        if (currentPublicId.isBlank()) {
+            return;
+        }
+
+        try {
+            Map resourcesResult = cloudinary.api().resources(ObjectUtils.asMap(
+                    "resource_type", "image",
+                    "type", "upload",
+                    "prefix", "avatars/" + userId,
+                    "max_results", 500
+            ));
+
+            Object resources = resourcesResult.get("resources");
+            if (!(resources instanceof List<?> resourceList)) {
+                return;
+            }
+
+            List<String> oldPublicIds = new ArrayList<>();
+            for (Object resource : resourceList) {
+                if (!(resource instanceof Map<?, ?> resourceMap)) {
+                    continue;
+                }
+
+                Object publicIdValue = resourceMap.get("public_id");
+                if (!(publicIdValue instanceof String publicId) || publicId.equals(currentPublicId)) {
+                    continue;
+                }
+
+                oldPublicIds.add(publicId);
+            }
+
+            if (!oldPublicIds.isEmpty()) {
+                cloudinary.api().deleteResources(oldPublicIds, ObjectUtils.asMap(
+                        "resource_type", "image",
+                        "type", "upload",
+                        "invalidate", true
+                ));
+            }
+        } catch (Exception exception) {
+            throw new AppException(ErrorCode.AVATAR_UPLOAD_FAILED);
         }
     }
 

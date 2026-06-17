@@ -74,13 +74,16 @@ public class UserService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        validateFullname(request.getFullname());
-
-        String oldAvatarUrl = user.getAvatarUrl();
         String newAvatarUrl = CloudinaryStorageService.saveAvatar(userId, request.getAvatar());
 
-        user.setFullname(request.getFullname().trim());
-        user.setSchool(normalizeOptionalText(request.getSchool()));
+        if (hasText(request.getFullname())) {
+            validateFullname(request.getFullname());
+            user.setFullname(request.getFullname().trim());
+        }
+
+        if (request.getSchool() != null) {
+            user.setSchool(normalizeOptionalText(request.getSchool()));
+        }
 
         if (newAvatarUrl != null) {
             user.setAvatarUrl(newAvatarUrl);
@@ -92,7 +95,7 @@ public class UserService {
             User savedUser = userRepo.save(user);
 
             if (newAvatarUrl != null) {
-                CloudinaryStorageService.deleteAvatar(oldAvatarUrl);
+                CloudinaryStorageService.deleteOldAvatars(userId, savedUser.getAvatarUrl());
             }
 
             return buildUserProfileResponse(savedUser);
