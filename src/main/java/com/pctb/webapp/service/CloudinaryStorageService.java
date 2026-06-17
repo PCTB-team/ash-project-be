@@ -8,10 +8,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -92,7 +94,15 @@ public class CloudinaryStorageService implements StorageService {
     @Override
     // Không dùng cho Cloudinary vì client có thể truy cập file qua HTTPS URL trực tiếp.
     public Resource loadAsResource(String storageUrl) {
-        return null;
+        if (storageUrl == null || storageUrl.isBlank()) {
+            throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        try {
+            return new UrlResource(storageUrl);
+        } catch (MalformedURLException exception) {
+            throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
     }
 
     // Upload avatar của user lên Cloudinary, ghi đè avatar cũ theo publicId cố định của user.
