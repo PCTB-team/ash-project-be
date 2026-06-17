@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -72,9 +74,13 @@ public class UserController {
     @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UserProfileResponse> updateProfile(
             @Parameter(hidden = true) JwtAuthenticationToken authentication,
-            @ModelAttribute @Valid UpdateProfileRequest request
+            @ModelAttribute @Valid UpdateProfileRequest request,
+            @RequestParam(value = "file", required = false) MultipartFile file
     ) {
         String userId = authentication.getToken().getSubject();
+        if ((request.getAvatar() == null || request.getAvatar().isEmpty()) && file != null && !file.isEmpty()) {
+            request.setAvatar(file);
+        }
 
         return ApiResponse.<UserProfileResponse>builder()
                 .message("Update profile successfully")
