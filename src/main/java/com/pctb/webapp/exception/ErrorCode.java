@@ -255,7 +255,8 @@ public enum ErrorCode {
 
     // ==================== ADMIN ADVANCED ERRORS (14xx) ====================
 
-    // Dùng khi Admin cố tình tự khóa tài khoản của chính mình    ADMIN_CANNOT_LOCK_SELF(1401, "Quản trị viên không thể tự khóa tài khoản của mình", HttpStatus.BAD_REQUEST),
+    // Dùng khi Admin cố tình tự khóa tài khoản của chính mình
+    ADMIN_CANNOT_LOCK_SELF(1401, "Quản trị viên không thể tự khóa tài khoản của mình", HttpStatus.BAD_REQUEST),
 
     // Dùng khi tài khoản đã bị khóa bởi hệ thống/Admin rồi nhưng vẫn cố tình đăng nhập
     ACCOUNT_IS_LOCKED(1402, "Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ", HttpStatus.FORBIDDEN),
