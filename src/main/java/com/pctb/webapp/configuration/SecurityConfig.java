@@ -59,7 +59,8 @@ public class SecurityConfig {
                                 "/auth/otp-verification",
                                 "/set-with-ttl",
                                 "/increment").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/logout","/ai/chat").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/ai/chat").authenticated()
                         .requestMatchers(HttpMethod.GET,"/redis/get").permitAll()
                         // Cho phép FE load avatar đã upload mà không cần quyền ADMIN.
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
@@ -72,6 +73,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/user/profile").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/user/profile").authenticated()
                         .requestMatchers("/admin/users").hasRole("ADMIN")
+                        .requestMatchers("/payment/webhook/**").permitAll()
+                        //(user login mới thanh toán)
+                        .requestMatchers("/payment/**").authenticated()
                         .anyRequest().authenticated()
 
 

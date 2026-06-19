@@ -265,7 +265,22 @@ public enum ErrorCode {
     LOCK_REASON_REQUIRED(1403, "Yêu cầu lý do khóa tài khoản", HttpStatus.BAD_REQUEST),
 
     // Dùng khi tài khoản đang ở trạng thái bình thường nhưng Admin lại gọi API mở khóa
-    ACCOUNT_ALREADY_UNLOCKED(1404, "Tài khoản đã được mở khóa", HttpStatus.CONFLICT);
+    ACCOUNT_ALREADY_UNLOCKED(1404, "Tài khoản đã được mở khóa", HttpStatus.CONFLICT),
+
+    // --- ĐỊNH NGHĨA MÃ LỖI NGHIỆP VỤ CHO MODULE PAYMENT (STORAGE VIP) ---
+    PLAN_NOT_FOUND(1501, "Gói nâng cấp dung lượng không tồn tại trên hệ thống", HttpStatus.NOT_FOUND),
+
+    TRANSACTION_NOT_FOUND(1502, "Mã hóa đơn giao dịch không hợp lệ hoặc không tồn tại", HttpStatus.NOT_FOUND),
+
+    DUPLICATE_TRANSACTION(1503, "Yêu cầu thanh toán trùng lặp, hệ thống đã chặn xử lý lặp lại!", HttpStatus.BAD_REQUEST),
+
+    UNAUTHORIZED(1504, "User phải đăng nhập trước khi sử dụng hệ thống", HttpStatus.UNAUTHORIZED),
+
+    FORBIDDEN(1505, "Chỉ tài khoản có quyền USER mới được thực hiện nâng cấp dung lượng", HttpStatus.FORBIDDEN),
+
+    PAYMENT_GATEWAY_ERROR(1506, "Không thể kết nối cổng thanh toán PayOS", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    INVALID_SIGNATURE(1507, "Chữ ký webhook không hợp lệ", HttpStatus.UNAUTHORIZED);
 
     private final int code;
 
