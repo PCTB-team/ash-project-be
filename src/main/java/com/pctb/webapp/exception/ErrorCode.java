@@ -243,6 +243,14 @@ public enum ErrorCode {
 
     GROUP_FILE_NOT_IN_GROUP(1231, "Tệp không thuộc nhóm này", HttpStatus.BAD_REQUEST),
 
+    GROUP_PASSWORD_INVALID(1232, "Mật khẩu nhóm không hợp lệ ", HttpStatus.BAD_REQUEST),
+
+    GROUP_CONFIRM_PASSWORD_NOT_MATCH(1233, "Xác nhận mật khẩu không khớp với mật khẩu nhóm ", HttpStatus.BAD_REQUEST),
+
+    GROUP_NEW_PASSWORD_SAME_AS_OLD(1234, "Mật khẩu nhóm mới phải khác với mật khẩu nhóm cũ ", HttpStatus.BAD_REQUEST),
+
+    GROUP_LEADER_CANNOT_LEAVE(1235, "Group leader cannot leave group", HttpStatus.BAD_REQUEST),
+
     FOLDER_NAME_REQUIRED(1318, "Yêu cầu tên thư mục", HttpStatus.BAD_REQUEST),
 
     FOLDER_NAME_INVALID(1319, "Tên thư mục không hợp lệ", HttpStatus.BAD_REQUEST),

@@ -2,12 +2,12 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.CreateGroupRequest;
 import com.pctb.webapp.dto.request.JoinGroupRequest;
+import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
-import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
@@ -120,6 +120,18 @@ public class GroupService {
         return responses;
     }
 
+    @Transactional
+    public GroupSummaryResponse getGroupDetail(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        GroupMember member = requireApprovedMember(groupId, currentUser);
+
+        // Tra ve thong tin group kem role/quyen cua user hien tai de FE render trang detail.
+        return buildGroupSummaryResponse(member.getGroup(), member, currentUser);
+    }
+
     @Transactional(readOnly = true)
     public GroupPreviewResponse getGroupPreview(String inviteToken) {
         StudyGroup group = getGroupByInviteToken(inviteToken);
@@ -204,6 +216,28 @@ public class GroupService {
     }
 
     @Transactional
+    public GroupMemberResponse leaveGroup(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        GroupMember member = groupMemberRepo
+                .findByGroupIdAndUserId(normalizeRequiredText(groupId), currentUser.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_ACCESS_DENIED));
+
+        // Leader khong duoc roi group bang luong member; can chuyen quyen hoac xoa group rieng.
+        if (member.getRole() == GroupRole.LEADER) {
+            throw new AppException(ErrorCode.GROUP_LEADER_CANNOT_LEAVE);
+        }
+
+        member.setCanUpload(false);
+        GroupMemberResponse response = buildGroupMemberResponse(member);
+        groupMemberRepo.delete(member);
+
+        return response;
+    }
+
+    @Transactional
     public CreateGroupResponse regenerateInviteToken(
             String groupId,
             JwtAuthenticationToken authentication
@@ -220,34 +254,31 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupStatisticsResponse getStatistics(
+    public CreateGroupResponse updateGroupPassword(
             String groupId,
+            UpdateGroupPasswordRequest request,
             JwtAuthenticationToken authentication
     ) {
         User currentUser = getCurrentUser(authentication);
-        GroupMember member = requireApprovedMember(groupId, currentUser);
-        StudyGroup group = member.getGroup();
-        long totalMembers = groupMemberRepo.countByGroupId(group.getId());
+        GroupMember leader = requireLeader(groupId, currentUser);
+        StudyGroup group = leader.getGroup();
+        String newPassword = normalizeRequiredGroupPassword(request == null ? null : request.getNewPassword());
+        String confirmPassword = normalizeRequiredGroupPassword(request == null ? null : request.getConfirmPassword());
 
-        return GroupStatisticsResponse.builder()
-                .groupId(group.getId())
-                .groupName(group.getName())
-                .totalMembers(totalMembers)
-                .totalApprovedMembers(totalMembers)
-                .totalActiveDocuments(groupFileRepo.countByGroupIdAndDeletedFalse(group.getId()))
-                .totalTrashDocuments(groupFileRepo.countByGroupIdAndDeletedTrue(group.getId()))
-                .build();
-    }
+        // Kiem tra confirm truoc khi ma hoa password moi.
+        if (!newPassword.equals(confirmPassword)) {
+            throw new AppException(ErrorCode.GROUP_CONFIRM_PASSWORD_NOT_MATCH);
+        }
 
-    @Transactional
-    public Long getMemberCount(
-            String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        User currentUser = getCurrentUser(authentication);
-        GroupMember member = requireApprovedMember(groupId, currentUser);
+        // BCrypt khong giai ma nguoc, nen dung matches de so voi hash cu.
+        if (passwordEncoder.matches(newPassword, group.getPassword())) {
+            throw new AppException(ErrorCode.GROUP_NEW_PASSWORD_SAME_AS_OLD);
+        }
 
-        return groupMemberRepo.countByGroupId(member.getGroup().getId());
+        group.setPassword(passwordEncoder.encode(newPassword));
+        group.setUpdatedAt(LocalDateTime.now());
+
+        return buildCreateGroupResponse(studyGroupRepo.save(group));
     }
 
     @Transactional
@@ -417,6 +448,7 @@ public class GroupService {
                 .inviteLink(isLeader ? buildInviteLink(group.getInviteToken()) : null)
                 .memberCount(groupMemberRepo.countByGroupId(group.getId()))
                 .activeFileCount(groupFileRepo.countByGroupIdAndDeletedFalse(group.getId()))
+                .trashFileCount(groupFileRepo.countByGroupIdAndDeletedTrue(group.getId()))
                 .createdAt(group.getCreatedAt() == null ? null : group.getCreatedAt().toString())
                 .updatedAt(group.getUpdatedAt() == null ? null : group.getUpdatedAt().toString())
                 .build();
@@ -450,6 +482,15 @@ public class GroupService {
         String normalizedValue = normalizeOptionalText(value);
         if (normalizedValue == null) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+
+        return normalizedValue;
+    }
+
+    private String normalizeRequiredGroupPassword(String value) {
+        String normalizedValue = normalizeOptionalText(value);
+        if (normalizedValue == null) {
+            throw new AppException(ErrorCode.GROUP_PASSWORD_INVALID);
         }
 
         return normalizedValue;

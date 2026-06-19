@@ -2,13 +2,13 @@ package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.CreateGroupRequest;
 import com.pctb.webapp.dto.request.JoinGroupRequest;
+import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
-import com.pctb.webapp.dto.response.GroupStatisticsResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.service.GroupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +62,22 @@ public class GroupController {
         return ApiResponse.<List<GroupSummaryResponse>>builder()
                 .message("Get my groups successfully")
                 .result(groupService.getMyGroups(authentication))
+                .build();
+    }
+
+    /**
+     * Lay chi tiet mot group ma user dang tham gia.
+     * FE dung API nay khi refresh thang trang detail group.
+     */
+    @Operation(summary = "Get group detail")
+    @GetMapping("/{groupId}")
+    public ApiResponse<GroupSummaryResponse> getGroupDetail(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupSummaryResponse>builder()
+                .message("Get group detail successfully")
+                .result(groupService.getGroupDetail(groupId, authentication))
                 .build();
     }
 
@@ -132,6 +148,22 @@ public class GroupController {
     }
 
     /**
+     * Member tu roi khoi group.
+     * Backend lay user hien tai tu JWT, FE khong can gui memberId.
+     */
+    @Operation(summary = "Leave group")
+    @PutMapping("/{groupId}/leave")
+    public ApiResponse<GroupMemberResponse> leaveGroup(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .message("Leave group successfully")
+                .result(groupService.leaveGroup(groupId, authentication))
+                .build();
+    }
+
+    /**
      * Leader tao inviteToken moi khi link cu bi lo.
      */
     @Operation(summary = "Regenerate group invite token")
@@ -147,17 +179,19 @@ public class GroupController {
     }
 
     /**
-     * Member trong group xem so luong thanh vien hien tai.
+     * Leader doi password group.
+     * Backend chi luu password da ma hoa, khong tra password ra FE.
      */
-    @Operation(summary = "Get group member count")
-    @GetMapping("/{groupId}/members/count")
-    public ApiResponse<Long> getMemberCount(
+    @Operation(summary = "Update group password")
+    @PutMapping("/{groupId}/password")
+    public ApiResponse<CreateGroupResponse> updateGroupPassword(
             @PathVariable String groupId,
+            @RequestBody @Valid UpdateGroupPasswordRequest request,
             JwtAuthenticationToken authentication
     ) {
-        return ApiResponse.<Long>builder()
-                .message("Get group member count successfully")
-                .result(groupService.getMemberCount(groupId, authentication))
+        return ApiResponse.<CreateGroupResponse>builder()
+                .message("Update group password successfully")
+                .result(groupService.updateGroupPassword(groupId, request, authentication))
                 .build();
     }
 
@@ -176,18 +210,4 @@ public class GroupController {
                 .build();
     }
 
-    /**
-     * Member trong group xem thong ke member/document/trash trong group.
-     */
-    @Operation(summary = "Get group statistics")
-    @GetMapping("/{groupId}/statistics")
-    public ApiResponse<GroupStatisticsResponse> getStatistics(
-            @PathVariable String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<GroupStatisticsResponse>builder()
-                .message("Get group statistics successfully")
-                .result(groupService.getStatistics(groupId, authentication))
-                .build();
-    }
 }

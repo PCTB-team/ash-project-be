@@ -104,14 +104,25 @@ public class GroupFileService {
     }
 
     /**
-     * Get active files in a group.
+     * Get active or trashed files in a group.
+     * Active files are visible to group members; trash files are visible to leader only.
      */
     @Transactional
     public List<GroupFileResponse> getGroupFiles(
             String groupId,
+            Boolean deleted,
             JwtAuthenticationToken authentication
     ) {
         User currentUser = getCurrentUser(authentication);
+        if (Boolean.TRUE.equals(deleted)) {
+            requireLeader(groupId, currentUser);
+
+            return groupFileRepo.findByGroupIdAndDeletedTrueOrderByDeletedAtDesc(groupId)
+                    .stream()
+                    .map(this::buildGroupFileResponse)
+                    .toList();
+        }
+
         requireApprovedMember(groupId, currentUser);
 
         return groupFileRepo.findByGroupIdAndDeletedFalseOrderByUploadedAtDesc(groupId)
@@ -140,23 +151,6 @@ public class GroupFileService {
         groupFile.setDeleted(true);
         groupFile.setDeletedAt(LocalDateTime.now());
         groupFileRepo.save(groupFile);
-    }
-
-    /**
-     * Get trashed group files.
-     */
-    @Transactional
-    public List<GroupFileResponse> getTrashFiles(
-            String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        User currentUser = getCurrentUser(authentication);
-        requireLeader(groupId, currentUser);
-
-        return groupFileRepo.findByGroupIdAndDeletedTrueOrderByDeletedAtDesc(groupId)
-                .stream()
-                .map(this::buildGroupFileResponse)
-                .toList();
     }
 
     /**
