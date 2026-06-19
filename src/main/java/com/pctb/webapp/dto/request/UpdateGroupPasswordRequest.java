@@ -1,4 +1,4 @@
-package com.pctb.webapp.dto.response;
+package com.pctb.webapp.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -14,16 +14,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupStatisticsResponse {
-    String groupId;
+public class UpdateGroupPasswordRequest {
+    String newPassword;
 
-    String groupName;
-
-    Long totalMembers;
-
-    Long totalApprovedMembers;
-
-    Long totalActiveDocuments;
-
-    Long totalTrashDocuments;
+    String confirmPassword;
 }

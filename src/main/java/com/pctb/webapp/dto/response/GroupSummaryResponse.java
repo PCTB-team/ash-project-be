@@ -39,6 +39,8 @@ public class GroupSummaryResponse {
 
     Long activeFileCount;
 
+    Long trashFileCount;
+
     String createdAt;
 
     String updatedAt;

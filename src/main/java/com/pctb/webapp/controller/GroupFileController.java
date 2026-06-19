@@ -46,17 +46,19 @@ public class GroupFileController {
     }
 
     /**
-     * Members can view active group files.
+     * Members view active files by default.
+     * Leader can pass deleted=true to view trash files through the same endpoint.
      */
     @Operation(summary = "Get group files")
     @GetMapping("/{groupId}/files")
     public ApiResponse<List<GroupFileResponse>> getGroupFiles(
             @PathVariable String groupId,
+            @RequestParam(value = "deleted", defaultValue = "false") Boolean deleted,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<List<GroupFileResponse>>builder()
                 .message("Get group files successfully")
-                .result(groupFileService.getGroupFiles(groupId, authentication))
+                .result(groupFileService.getGroupFiles(groupId, deleted, authentication))
                 .build();
     }
 
@@ -75,21 +77,6 @@ public class GroupFileController {
         return ApiResponse.<String>builder()
                 .message("Move group file to trash successfully")
                 .result("DELETED")
-                .build();
-    }
-
-    /**
-     * Leader views trashed group files.
-     */
-    @Operation(summary = "Get group trash files")
-    @GetMapping("/{groupId}/trash/files")
-    public ApiResponse<List<GroupFileResponse>> getTrashFiles(
-            @PathVariable String groupId,
-            JwtAuthenticationToken authentication
-    ) {
-        return ApiResponse.<List<GroupFileResponse>>builder()
-                .message("Get group trash files successfully")
-                .result(groupFileService.getTrashFiles(groupId, authentication))
                 .build();
     }
 
