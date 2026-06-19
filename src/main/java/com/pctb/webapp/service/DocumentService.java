@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.request.UpdateDocumentRequest;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
+import com.pctb.webapp.dto.response.FileSystemItemResponse;
 import com.pctb.webapp.dto.response.FilteredDocumentResponse;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
@@ -17,7 +18,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -79,6 +83,40 @@ public class DocumentService {
                         PageRequest.of(normalizedPage, normalizedSize)
                 )
                 .map(this::buildDocumentResponse);
+    }
+
+    public Page<FileSystemItemResponse> getMyFileSystemItemsPage(
+            JwtAuthenticationToken authentication,
+            int page,
+            int size,
+            String folderId
+    ) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+
+        if (normalizedFolderId != null) {
+            resolveFolder(normalizedFolderId, userId);
+        }
+
+        List<FileSystemItemResponse> items = new ArrayList<>();
+        documentRepo.findActiveListByOwnerIdAndFolderId(userId, normalizedFolderId)
+                .forEach(document -> items.add(buildFileItemResponse(document)));
+        folderRepo.findActiveByOwnerIdAndParentId(userId, normalizedFolderId)
+                .forEach(folder -> items.add(buildFolderItemResponse(folder)));
+
+        items.sort(Comparator.comparing(
+                FileSystemItemResponse::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+
+        int total = items.size();
+        int fromIndex = Math.min(normalizedPage * normalizedSize, total);
+        int toIndex = Math.min(fromIndex + normalizedSize, total);
+        Pageable pageable = PageRequest.of(normalizedPage, normalizedSize);
+
+        return new PageImpl<>(items.subList(fromIndex, toIndex), pageable, total);
     }
 
     public Page<DocumentResponse> searchMyDocuments(
@@ -480,6 +518,40 @@ public class DocumentService {
                 .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(document.getDeleted()))
                 .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
+                .build();
+    }
+
+    private FileSystemItemResponse buildFileItemResponse(Document document) {
+        return FileSystemItemResponse.builder()
+                .id(document.getId())
+                .type("FILE")
+                .name(document.getFileName())
+                .fileExtension(document.getFileExtension())
+                .mimeType(document.getMimeType())
+                .size(document.getFileSize())
+                .parentFolderId(document.getFolder() == null ? null : document.getFolder().getId())
+                .storageUrl(document.getStorageUrl())
+                .viewUrl(buildDocumentViewUrl(document.getId()))
+                .downloadUrl(buildDocumentDownloadUrl(document.getId()))
+                .status(document.getStatus().name())
+                .createdAt(document.getCreatedAt() == null ? null : document.getCreatedAt().toString())
+                .updatedAt(document.getUpdatedAt() == null ? null : document.getUpdatedAt().toString())
+                .timeSinceCreated(formatTimeSinceUpload(document.getCreatedAt()))
+                .deleted(Boolean.TRUE.equals(document.getDeleted()))
+                .build();
+    }
+
+    private FileSystemItemResponse buildFolderItemResponse(Folder folder) {
+        return FileSystemItemResponse.builder()
+                .id(folder.getId())
+                .type("FOLDER")
+                .name(folder.getName())
+                .size(folder.getSize())
+                .parentFolderId(folder.getParent() == null ? null : folder.getParent().getId())
+                .createdAt(folder.getCreatedAt() == null ? null : folder.getCreatedAt().toString())
+                .updatedAt(folder.getUpdatedAt() == null ? null : folder.getUpdatedAt().toString())
+                .timeSinceCreated(formatTimeSinceUpload(folder.getCreatedAt()))
+                .deleted(Boolean.TRUE.equals(folder.getDeleted()))
                 .build();
     }
 

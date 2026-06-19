@@ -70,6 +70,9 @@ public interface DocumentRepo extends JpaRepository<Document, String> {
     )
     Page<Document> findActiveByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId, Pageable pageable);
 
+    @Query("select d from Document d where d.owner.id = :ownerId and ((:folderId is null and d.folder is null) or d.folder.id = :folderId) and (d.deleted = false or d.deleted is null)")
+    List<Document> findActiveListByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId);
+
     @Query("select d from Document d where d.owner.id = :ownerId and d.folder.id = :folderId and (d.deleted = false or d.deleted is null)")
     List<Document> findActiveFilesByOwnerIdAndFolderId(@Param("ownerId") String ownerId, @Param("folderId") String folderId);
 
