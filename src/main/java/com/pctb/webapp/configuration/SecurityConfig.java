@@ -65,6 +65,7 @@ public class SecurityConfig {
                         // Cho phép FE load avatar đã upload mà không cần quyền ADMIN.
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/groups/invite/**").permitAll()
                         .requestMatchers("/groups/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/documents/**").hasAnyRole("USER", "ADMIN")
