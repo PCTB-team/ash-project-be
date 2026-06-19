@@ -14,6 +14,7 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+// Trả về response get item  bao gồm file và folder
 public class FileSystemItemResponse {
     String id;
 

@@ -2,6 +2,7 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.UpdateDocumentRequest;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
+import com.pctb.webapp.dto.response.DocumentPreviewResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
 import com.pctb.webapp.dto.response.FileSystemItemResponse;
@@ -14,6 +15,7 @@ import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.util.DateTimeUtils;
+import com.pctb.webapp.util.DocumentPreviewUtils;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -566,4 +568,34 @@ public class DocumentService {
     }
 
     // Chuyển thời điểm upload thành chuỗi tương đối như "vừa xong", "3 phút trước".
+    public DocumentPreviewResponse getMyDocumentPreview(String documentId, JwtAuthenticationToken authentication) {
+        Document document = resolveActiveOwnedDocument(documentId, authentication.getName());
+
+        return DocumentPreviewResponse.builder()
+                .documentId(document.getId())
+                .fileName(document.getFileName())
+                .fileExtension(document.getFileExtension())
+                .previewUrl(DocumentPreviewUtils.resolvePreviewUrl(document.getFileExtension(), document.getStorageUrl()))
+                .previewMode(DocumentPreviewUtils.resolvePreviewMode(document.getFileExtension()))
+                .previewSupported(DocumentPreviewUtils.isPreviewSupported(document.getFileExtension()))
+                .build();
+    }
+
+    private Document resolveActiveOwnedDocument(String documentId, String userId) {
+        User owner = userRepo.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!owner.getId().equals(document.getOwner().getId())) {
+            throw new AppException(ErrorCode.DOCUMENT_ACCESS_DENIED);
+        }
+
+        if (Boolean.TRUE.equals(document.getDeleted())) {
+            throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        return document;
+    }
 }

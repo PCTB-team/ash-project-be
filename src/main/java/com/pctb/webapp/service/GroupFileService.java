@@ -13,6 +13,7 @@ import com.pctb.webapp.repository.GroupFileRepo;
 import com.pctb.webapp.repository.GroupMemberRepo;
 import com.pctb.webapp.repository.StudyGroupRepo;
 import com.pctb.webapp.repository.UserRepo;
+import com.pctb.webapp.util.DocumentPreviewUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -321,17 +322,34 @@ public class GroupFileService {
     }
 
     private GroupFileResponse buildGroupFileResponse(GroupFile groupFile) {
+        String fileExtension = extractFileExtension(groupFile.getFileName());
         return GroupFileResponse.builder()
                 .fileId(groupFile.getId())
                 .fileName(groupFile.getFileName())
                 .mimeType(groupFile.getMimeType())
                 .fileSize(groupFile.getFileSize())
                 .storageUrl(groupFile.getStorageUrl())
+                .previewUrl(DocumentPreviewUtils.resolvePreviewUrl(fileExtension, groupFile.getStorageUrl()))
+                .previewMode(DocumentPreviewUtils.resolvePreviewMode(fileExtension))
+                .previewSupported(DocumentPreviewUtils.isPreviewSupported(fileExtension))
                 .uploadedBy(groupFile.getUploadedBy().getFullname())
                 .uploadedAt(groupFile.getUploadedAt() == null ? null : groupFile.getUploadedAt().toString())
                 .deleted(Boolean.TRUE.equals(groupFile.getDeleted()))
                 .deletedAt(groupFile.getDeletedAt() == null ? null : groupFile.getDeletedAt().toString())
                 .build();
+    }
+
+    private String extractFileExtension(String fileName) {
+        if (fileName == null) {
+            return "";
+        }
+
+        int lastDotIndex = fileName.lastIndexOf('.');
+        if (lastDotIndex < 0 || lastDotIndex == fileName.length() - 1) {
+            return "";
+        }
+
+        return fileName.substring(lastDotIndex + 1);
     }
 
     private String normalizeRequiredText(String value) {

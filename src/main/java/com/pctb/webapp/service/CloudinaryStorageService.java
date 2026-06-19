@@ -36,14 +36,12 @@ public class CloudinaryStorageService implements StorageService {
     // Gửi bytes của file lên Cloudinary và trả về secure_url để lưu vào Document.
     public String upload(MultipartFile file, String fileName) {
         try {
-            String publicId = fileName;
-            if (publicId.contains(".")) {
-                publicId = publicId.substring(0, publicId.lastIndexOf('.'));
-            }
+            String resourceType = determineUploadResourceType(fileName);
+            String publicId = buildUploadPublicId(fileName, resourceType);
 
             Map params = ObjectUtils.asMap(
                     "public_id", publicId,
-                    "resource_type", "auto",
+                    "resource_type", resourceType,
                     "overwrite", true
             );
 
@@ -64,8 +62,8 @@ public class CloudinaryStorageService implements StorageService {
             return;
         }
         try {
-            String publicId = extractPublicId(storageUrl);
             String resourceType = determinateResourceType(storageUrl);
+            String publicId = extractPublicId(storageUrl, resourceType);
 
             cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", resourceType));
         } catch (IOException exception) {
@@ -78,13 +76,9 @@ public class CloudinaryStorageService implements StorageService {
     // Rename publicId trên Cloudinary để đồng bộ với tên file mới trong database.
     public String rename(String oldStorageUrl, String newFileName) {
         try {
-            String oldPublicId = extractPublicId(oldStorageUrl);
-            String newPublicId = newFileName;
-            if (newPublicId.contains(".")) {
-                newPublicId = newPublicId.substring(0, newPublicId.lastIndexOf('.'));
-            }
-
             String resourceType = determinateResourceType(oldStorageUrl);
+            String oldPublicId = extractPublicId(oldStorageUrl, resourceType);
+            String newPublicId = buildUploadPublicId(newFileName, resourceType);
 
             Map renameResult = cloudinary.uploader().rename(oldPublicId, newPublicId,
                     ObjectUtils.asMap("resource_type", resourceType, "overwrite", true));
@@ -139,7 +133,7 @@ public class CloudinaryStorageService implements StorageService {
             return;
         }
         try {
-            String publicId = extractPublicId(avatarUrl);
+            String publicId = extractPublicId(avatarUrl, "image");
             if (publicId.isBlank()) {
                 return;
             }
@@ -155,7 +149,7 @@ public class CloudinaryStorageService implements StorageService {
             return;
         }
 
-        String currentPublicId = extractPublicId(currentAvatarUrl);
+        String currentPublicId = extractPublicId(currentAvatarUrl, "image");
         if (currentPublicId.isBlank()) {
             return;
         }
@@ -238,7 +232,19 @@ public class CloudinaryStorageService implements StorageService {
         return message != null && message.toLowerCase(Locale.ROOT).contains("file size too large");
     }
 
-    private String extractPublicId(String url) {
+    private String buildUploadPublicId(String fileName, String resourceType) {
+        if ("raw".equals(resourceType)) {
+            return fileName;
+        }
+
+        if (fileName.contains(".")) {
+            return fileName.substring(0, fileName.lastIndexOf('.'));
+        }
+
+        return fileName;
+    }
+
+    private String extractPublicId(String url, String resourceType) {
         if (url == null || url.isBlank() || !url.contains("upload/")) {
             return "";
         }
@@ -258,11 +264,35 @@ public class CloudinaryStorageService implements StorageService {
         }
 
         int lastDot = splitPart.lastIndexOf('.');
-        if (lastDot != -1) {
+        if (lastDot != -1 && !"raw".equals(resourceType)) {
             splitPart = splitPart.substring(0, lastDot);
         }
 
         return splitPart;
+    }
+
+    private String determineUploadResourceType(String fileName) {
+        String lowerCaseFileName = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
+
+        if (lowerCaseFileName.endsWith(".mp3") || lowerCaseFileName.endsWith(".mp4")) {
+            return "video";
+        }
+
+        if (lowerCaseFileName.endsWith(".pdf")
+                || lowerCaseFileName.endsWith(".docx")
+                || lowerCaseFileName.endsWith(".ppt")
+                || lowerCaseFileName.endsWith(".pptx")
+                || lowerCaseFileName.endsWith(".xls")
+                || lowerCaseFileName.endsWith(".xlsx")
+                || lowerCaseFileName.endsWith(".txt")
+                || lowerCaseFileName.endsWith(".csv")
+                || lowerCaseFileName.endsWith(".md")
+                || lowerCaseFileName.endsWith(".zip")
+                || lowerCaseFileName.endsWith(".rar")) {
+            return "raw";
+        }
+
+        return "image";
     }
 
     // Xác định resource_type Cloudinary cần dùng khi destroy/rename dựa trên URL và đuôi file.

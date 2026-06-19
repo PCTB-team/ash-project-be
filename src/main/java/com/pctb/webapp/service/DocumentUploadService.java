@@ -54,7 +54,7 @@ public class DocumentUploadService {
             JwtAuthenticationToken authentication
     ) {
         String userId = authentication.getName();
-        User owner = userRepo.findById(userId)
+        User owner = userRepo.findByIdForUpdate(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         String normalizedFolderId = normalizeOptionalId(folderId);
         Folder folder = resolveFolder(normalizedFolderId, userId);
