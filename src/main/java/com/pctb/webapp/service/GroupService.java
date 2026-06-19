@@ -11,6 +11,7 @@ import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
+import com.pctb.webapp.entity.NotificationType;
 import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
@@ -50,6 +51,8 @@ public class GroupService {
     UserRepo userRepo;
 
     PasswordEncoder passwordEncoder;
+
+    NotificationService notificationService;
 
     @Value("${app.group.invite-base-url:http://localhost:3000/join}")
     @NonFinal
@@ -173,6 +176,19 @@ public class GroupService {
                 .joinedAt(LocalDateTime.now())
                 .build();
         groupMemberRepo.save(member);
+
+        // Thong bao cho cac thanh vien cu biet co user moi tham gia group.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                NotificationType.GROUP_MEMBER_JOINED,
+                "Thanh vien moi tham gia",
+                currentUser.getFullname() + " da tham gia nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                Set.of(currentUser.getId())
+        );
     }
 
     @Transactional
@@ -191,8 +207,50 @@ public class GroupService {
 
         GroupMember member = getMemberInGroup(groupId, memberId);
         member.setCanUpload(request.getCanUpload());
+        GroupMember savedMember = groupMemberRepo.save(member);
+        StudyGroup group = savedMember.getGroup();
+        User targetUser = savedMember.getUser();
 
-        return buildGroupMemberResponse(groupMemberRepo.save(member));
+        // Bao rieng cho member duoc cap/thu hoi quyen upload.
+        notificationService.create(
+                targetUser,
+                currentUser,
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
+                        : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? "Ban da duoc cap quyen upload"
+                        : "Quyen upload da bi thu hoi",
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? "Leader da cho phep ban tai tai lieu len nhom \"" + group.getName() + "\"."
+                        : "Ban khong con quyen tai tai lieu len nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                group.getId(),
+                group.getName()
+        );
+
+        // Bao cho cac member con lai de ho thay activity cua group.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
+                        : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? "Quyen upload da duoc cap"
+                        : "Quyen upload da bi thu hoi",
+                Boolean.TRUE.equals(request.getCanUpload())
+                        ? targetUser.getFullname() + " da duoc cap quyen upload trong nhom \"" + group.getName() + "\"."
+                        : targetUser.getFullname() + " da bi thu hoi quyen upload trong nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                Set.of(currentUser.getId(), targetUser.getId())
+        );
+
+        return buildGroupMemberResponse(savedMember);
     }
 
     @Transactional
@@ -208,6 +266,34 @@ public class GroupService {
         if (member.getRole() == GroupRole.LEADER) {
             throw new AppException(ErrorCode.GROUP_LEADER_CANNOT_BE_KICKED);
         }
+
+        StudyGroup group = member.getGroup();
+        User kickedUser = member.getUser();
+        notificationService.create(
+                kickedUser,
+                currentUser,
+                NotificationType.GROUP_MEMBER_KICKED,
+                "Ban da bi xoa khoi nhom",
+                "Ban da bi leader xoa khoi nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                group.getId(),
+                group.getName()
+        );
+
+        // Bao cho cac member con lai biet user nay da bi kick khoi group.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                NotificationType.GROUP_MEMBER_KICKED,
+                "Thanh vien da bi xoa khoi nhom",
+                kickedUser.getFullname() + " da bi xoa khoi nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                Set.of(currentUser.getId(), kickedUser.getId())
+        );
 
         member.setCanUpload(false);
         GroupMemberResponse response = buildGroupMemberResponse(member);
@@ -232,6 +318,21 @@ public class GroupService {
         }
 
         member.setCanUpload(false);
+        StudyGroup group = member.getGroup();
+
+        // Bao cho cac thanh vien con lai biet user nay da roi group.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                NotificationType.GROUP_MEMBER_LEFT,
+                "Thanh vien da roi nhom",
+                currentUser.getFullname() + " da roi khoi nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP,
+                group.getId(),
+                group.getName(),
+                Set.of(currentUser.getId())
+        );
+
         GroupMemberResponse response = buildGroupMemberResponse(member);
         groupMemberRepo.delete(member);
 
@@ -279,7 +380,20 @@ public class GroupService {
         group.setPassword(passwordEncoder.encode(newPassword));
         group.setUpdatedAt(LocalDateTime.now());
 
-        return buildCreateGroupResponse(studyGroupRepo.save(group));
+        StudyGroup savedGroup = studyGroupRepo.save(group);
+        notificationService.createForGroupMembers(
+                savedGroup,
+                currentUser,
+                NotificationType.GROUP_PASSWORD_CHANGED,
+                "Mat khau nhom da thay doi",
+                "Mat khau cua nhom \"" + savedGroup.getName() + "\" da duoc cap nhat.",
+                NotificationType.GROUP,
+                savedGroup.getId(),
+                savedGroup.getName(),
+                Set.of(currentUser.getId())
+        );
+
+        return buildCreateGroupResponse(savedGroup);
     }
 
     @Transactional
