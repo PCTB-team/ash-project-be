@@ -28,6 +28,11 @@
 		<java.version>26</java.version>
 	</properties>
 	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
 		<!--Thư viện dùng cho ORM - JPA - Hibernate -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
