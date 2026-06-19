@@ -13,6 +13,7 @@ import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
+import com.pctb.webapp.util.DateTimeUtils;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -226,8 +226,8 @@ public class DocumentService {
 
         if (!Boolean.TRUE.equals(document.getDeleted())) {
             document.setDeleted(true);
-            document.setDeletedAt(LocalDateTime.now());
-            document.setUpdatedAt(LocalDateTime.now());
+            document.setDeletedAt(DateTimeUtils.nowUtc());
+            document.setUpdatedAt(DateTimeUtils.nowUtc());
             updateFolderSizeCascade(document.getFolder(), -safeFileSize(document));
             documentRepo.save(document);
         }
@@ -274,7 +274,7 @@ public class DocumentService {
 
         document.setDeleted(false);
         document.setDeletedAt(null);
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(DateTimeUtils.nowUtc());
         updateFolderSizeCascade(document.getFolder(), safeFileSize(document));
 
         document = documentRepo.save(document);
@@ -386,7 +386,7 @@ public class DocumentService {
         document.setTitle(newFileName);
         document.setFileName(newFileName);
         document.setFileExtension(newExtension);
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(DateTimeUtils.nowUtc());
 
         document = documentRepo.save(document);
 
@@ -406,7 +406,7 @@ public class DocumentService {
         while (current != null) {
             long currentSize = current.getSize() == null ? 0 : current.getSize();
             current.setSize(Math.max(0, currentSize + delta));
-            current.setUpdatedAt(LocalDateTime.now());
+            current.setUpdatedAt(DateTimeUtils.nowUtc());
             folderRepo.save(current);
             current = current.getParent();
         }
@@ -514,10 +514,10 @@ public class DocumentService {
                 .viewUrl(buildDocumentViewUrl(document.getId()))
                 .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
-                .uploadedAt(document.getCreatedAt() == null ? null : document.getCreatedAt().toString())
-                .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
+                .uploadedAt(DateTimeUtils.toDisplayDateTime(document.getCreatedAt()))
+                .timeSinceUpload(DateTimeUtils.formatTimeSince(document.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(document.getDeleted()))
-                .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
+                .deletedAt(DateTimeUtils.toDisplayDateTime(document.getDeletedAt()))
                 .build();
     }
 
@@ -534,9 +534,9 @@ public class DocumentService {
                 .viewUrl(buildDocumentViewUrl(document.getId()))
                 .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
-                .createdAt(document.getCreatedAt() == null ? null : document.getCreatedAt().toString())
-                .updatedAt(document.getUpdatedAt() == null ? null : document.getUpdatedAt().toString())
-                .timeSinceCreated(formatTimeSinceUpload(document.getCreatedAt()))
+                .createdAt(DateTimeUtils.toDisplayDateTime(document.getCreatedAt()))
+                .updatedAt(DateTimeUtils.toDisplayDateTime(document.getUpdatedAt()))
+                .timeSinceCreated(DateTimeUtils.formatTimeSince(document.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(document.getDeleted()))
                 .build();
     }
@@ -548,9 +548,9 @@ public class DocumentService {
                 .name(folder.getName())
                 .size(folder.getSize())
                 .parentFolderId(folder.getParent() == null ? null : folder.getParent().getId())
-                .createdAt(folder.getCreatedAt() == null ? null : folder.getCreatedAt().toString())
-                .updatedAt(folder.getUpdatedAt() == null ? null : folder.getUpdatedAt().toString())
-                .timeSinceCreated(formatTimeSinceUpload(folder.getCreatedAt()))
+                .createdAt(DateTimeUtils.toDisplayDateTime(folder.getCreatedAt()))
+                .updatedAt(DateTimeUtils.toDisplayDateTime(folder.getUpdatedAt()))
+                .timeSinceCreated(DateTimeUtils.formatTimeSince(folder.getCreatedAt()))
                 .deleted(Boolean.TRUE.equals(folder.getDeleted()))
                 .build();
     }
@@ -566,40 +566,4 @@ public class DocumentService {
     }
 
     // Chuyển thời điểm upload thành chuỗi tương đối như "vừa xong", "3 phút trước".
-    private String formatTimeSinceUpload(LocalDateTime uploadedAt) {
-        if (uploadedAt == null) {
-            return null;
-        }
-
-        Duration duration = Duration.between(uploadedAt, LocalDateTime.now());
-        if (duration.isNegative() || duration.getSeconds() < 5) {
-            return "v\u1eeba xong";
-        }
-
-        long seconds = duration.getSeconds();
-        if (seconds < 60) {
-            return seconds + " gi\u00e2y tr\u01b0\u1edbc";
-        }
-
-        long minutes = duration.toMinutes();
-        if (minutes < 60) {
-            return minutes + " ph\u00fat tr\u01b0\u1edbc";
-        }
-
-        long hours = duration.toHours();
-        if (hours < 24) {
-            return hours + " gi\u1edd tr\u01b0\u1edbc";
-        }
-
-        long days = duration.toDays();
-        if (days < 30) {
-            return days + " ng\u00e0y tr\u01b0\u1edbc";
-        }
-
-        if (days < 365) {
-            return days / 30 + " th\u00e1ng tr\u01b0\u1edbc";
-        }
-
-        return days / 365 + " n\u0103m tr\u01b0\u1edbc";
-    }
 }

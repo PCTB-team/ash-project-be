@@ -10,6 +10,7 @@ import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.UserRepo;
+import com.pctb.webapp.util.DateTimeUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -49,7 +50,7 @@ public class FolderService {
             throw new AppException(ErrorCode.FOLDER_ALREADY_EXISTS);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DateTimeUtils.nowUtc();
         Folder folder = Folder.builder()
                 .name(folderName)
                 .size(0L)
@@ -90,7 +91,7 @@ public class FolderService {
         Folder folder = folderRepo.findActiveByIdAndOwnerId(normalizedFolderId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
 
-        LocalDateTime deletedAt = LocalDateTime.now();
+        LocalDateTime deletedAt = DateTimeUtils.nowUtc();
         long removedSize = folder.getSize() == null ? 0 : folder.getSize();
 
         moveFolderTreeToTrash(folder, userId, deletedAt);
@@ -209,8 +210,9 @@ public class FolderService {
                 .parentFolderId(folder.getParent() == null ? null : folder.getParent().getId())
                 .size(folder.getSize())
                 .deleted(Boolean.TRUE.equals(folder.getDeleted()))
-                .createdAt(folder.getCreatedAt() == null ? null : folder.getCreatedAt().toString())
-                .updatedAt(folder.getUpdatedAt() == null ? null : folder.getUpdatedAt().toString())
+                .createdAt(DateTimeUtils.toDisplayDateTime(folder.getCreatedAt()))
+                .updatedAt(DateTimeUtils.toDisplayDateTime(folder.getUpdatedAt()))
+                .timeSinceCreated(DateTimeUtils.formatTimeSince(folder.getCreatedAt()))
                 .build();
     }
 }

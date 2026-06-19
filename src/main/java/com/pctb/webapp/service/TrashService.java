@@ -6,13 +6,15 @@ import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
+import com.pctb.webapp.util.DateTimeUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -53,7 +55,7 @@ public class TrashService {
                 .name(folder.getName())
                 .size(folder.getSize())
                 .parentFolderId(folder.getParent() == null ? null : folder.getParent().getId())
-                .deletedAt(folder.getDeletedAt() == null ? null : folder.getDeletedAt().toString())
+                .deletedAt(DateTimeUtils.toDisplayDateTime(folder.getDeletedAt()))
                 .build();
     }
 
@@ -66,15 +68,15 @@ public class TrashService {
                 .documentFolderId(document.getFolder() == null ? null : document.getFolder().getId())
                 .fileExtension(document.getFileExtension())
                 .mimeType(document.getMimeType())
-                .deletedAt(document.getDeletedAt() == null ? null : document.getDeletedAt().toString())
+                .deletedAt(DateTimeUtils.toDisplayDateTime(document.getDeletedAt()))
                 .build();
     }
 
-    private LocalDateTime parseDeletedAt(TrashItemResponse item) {
+    private Instant parseDeletedAt(TrashItemResponse item) {
         if (item.getDeletedAt() == null) {
             return null;
         }
 
-        return LocalDateTime.parse(item.getDeletedAt());
+        return OffsetDateTime.parse(item.getDeletedAt()).toInstant();
     }
 }

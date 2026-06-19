@@ -10,6 +10,7 @@ import com.pctb.webapp.exception.UploadStatus;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.UserRepo;
+import com.pctb.webapp.util.DateTimeUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -82,7 +83,7 @@ public class DocumentUploadService {
         }
 
         String storageUrl = storageService.upload(file, storedFileName);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DateTimeUtils.nowUtc();
 
         Document document = Document.builder()
                 .title(originalFileName)
@@ -113,8 +114,8 @@ public class DocumentUploadService {
                 .viewUrl(buildDocumentViewUrl(document.getId()))
                 .downloadUrl(buildDocumentDownloadUrl(document.getId()))
                 .status(document.getStatus().name())
-                .uploadedAt(document.getCreatedAt().toString())
-                .timeSinceUpload(formatTimeSinceUpload(document.getCreatedAt()))
+                .uploadedAt(DateTimeUtils.toDisplayDateTime(document.getCreatedAt()))
+                .timeSinceUpload(DateTimeUtils.formatTimeSince(document.getCreatedAt()))
                 .build();
     }
 
@@ -135,7 +136,7 @@ public class DocumentUploadService {
         while (current != null) {
             long currentSize = current.getSize() == null ? 0 : current.getSize();
             current.setSize(Math.max(0, currentSize + delta));
-            current.setUpdatedAt(LocalDateTime.now());
+            current.setUpdatedAt(DateTimeUtils.nowUtc());
             folderRepo.save(current);
             current = current.getParent();
         }
