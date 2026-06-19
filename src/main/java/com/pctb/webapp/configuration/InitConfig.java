@@ -1,8 +1,10 @@
 package com.pctb.webapp.configuration;
 import com.pctb.webapp.entity.Role;
 import com.pctb.webapp.entity.RoleEnum;
+import com.pctb.webapp.entity.StoragePlan;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.repository.RoleRepo;
+import com.pctb.webapp.repository.StoragePlanRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class InitConfig {
     final UserRepo userRepo;
     final RoleRepo roleRepo;
     final PasswordEncoder passwordEncoder;
+    final StoragePlanRepo planRepo; // Khai báo thêm để gọi tầng lưu gói dịch vụ
 
     @Value("${app.admin.username}")
     String adminUsername;
@@ -66,12 +69,47 @@ public class InitConfig {
                     .password(passwordEncoder.encode(adminPassword))
                     .fullname(adminFullname)
                     .verified(true)
+                    .storageQuota(5368709120L) // Đồng bộ tránh lỗi null bộ nhớ cho Admin
+                    .storageUsed(0L)
                     .roles(Set.of(adminRole))
                     .build();
 
             userRepo.save(admin);
 
             System.out.println("Admin account created: " + adminEmail);
+
+
+        };
+    }
+
+    @Bean
+    CommandLineRunner initStoragePlans() {
+        return args -> {
+            if (planRepo.count() == 0) {
+
+                planRepo.save(StoragePlan.builder()
+                        .id("PLAN_5GB")
+                        .planName("Gói Tăng Tốc Bộ Nhớ 5GB")
+                        .quotaSize(5368709120L)
+                        .price(20000L)
+                        .build());
+
+                planRepo.save(StoragePlan.builder()
+                        .id("PLAN_10GB")
+                        .planName("Gói Mở Rộng Bộ Nhớ 10GB")
+                        .quotaSize(10737418240L)
+                        .price(50000L)
+                        .build());
+
+                planRepo.save(StoragePlan.builder()
+                        .id("PLAN_50GB")
+                        .planName("Gói Dung Lượng Khổng Lồ 50GB")
+                        .quotaSize(53687091200L)
+                        .price(150000L)
+                        .build());
+
+                System.out.println(">> [SWP391] Đã nạp thành công các gói dung lượng VIP vào database!");
+            }
         };
     }
 }

@@ -72,4 +72,11 @@ public class User {
         }
     }
 
+    // === PHẦN QUẢN LÝ DUNG LƯỢNG VIP ===
+    @Column(nullable = false)
+    Long storageQuota = 5368709120L; // Hạn mức mặc định ban đầu là 5GB (= 5 * 1024 * 1024 * 1024 bytes)
+
+    @Column(nullable = false)
+    Long storageUsed = 0L; // Dung lượng thực tế user đã sài
+
 }
