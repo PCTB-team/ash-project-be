@@ -9,6 +9,7 @@ import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Set;
 
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -85,31 +87,37 @@ public class InitConfig {
     @Bean
     CommandLineRunner initStoragePlans() {
         return args -> {
-            if (planRepo.count() == 0) {
 
-                planRepo.save(StoragePlan.builder()
-                        .id("PLAN_5GB")
-                        .planName("Gói Tăng Tốc Bộ Nhớ 5GB")
-                        .quotaSize(5368709120L)
-                        .price(20000L)
-                        .build());
-
-                planRepo.save(StoragePlan.builder()
-                        .id("PLAN_10GB")
-                        .planName("Gói Mở Rộng Bộ Nhớ 10GB")
-                        .quotaSize(10737418240L)
-                        .price(50000L)
-                        .build());
-
-                planRepo.save(StoragePlan.builder()
-                        .id("PLAN_50GB")
-                        .planName("Gói Dung Lượng Khổng Lồ 50GB")
-                        .quotaSize(53687091200L)
-                        .price(150000L)
-                        .build());
-
-                System.out.println(">> [SWP391] Đã nạp thành công các gói dung lượng VIP vào database!");
+            if (planRepo.count() > 0) {
+                return;
             }
+
+            StoragePlan plan5gb = StoragePlan.builder()
+                    .id("PLAN_5GB")
+                    .planName("Gói Tăng Tốc Bộ Nhớ 5GB")
+                    .quotaSize(5L * 1024 * 1024 * 1024)
+                    .price(2000L)
+                    .build();
+
+            StoragePlan plan10gb = StoragePlan.builder()
+                    .id("PLAN_10GB")
+                    .planName("Gói Mở Rộng Bộ Nhớ 10GB")
+                    .quotaSize(10L * 1024 * 1024 * 1024)
+                    .price(3000L)
+                    .build();
+
+            StoragePlan plan50gb = StoragePlan.builder()
+                    .id("PLAN_50GB")
+                    .planName("Gói Dung Lượng Khổng Lồ 50GB")
+                    .quotaSize(50L * 1024 * 1024 * 1024)
+                    .price(4000L)
+                    .build();
+
+            planRepo.save(plan5gb);
+            planRepo.save(plan10gb);
+            planRepo.save(plan50gb);
+
+            log.info("[SWP391] Storage plans seeded successfully");
         };
     }
 }

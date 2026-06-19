@@ -48,8 +48,8 @@ public class PayOSService {
                     .orderCode(tx.getOrderCode())
                     .amount(amount)
                     .description("Upgrade storage plan")
-                    .returnUrl("http://localhost:3000/payment/success")
-                    .cancelUrl("http://localhost:3000/payment/cancel")
+                    .returnUrl("https://ash-project-fe.vercel.app/payment/success")
+                    .cancelUrl("https://ash-project-fe.vercel.app/payment/cancel")
                     .items(List.of(item))
                     .build();
 
