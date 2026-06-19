@@ -23,4 +23,6 @@ public class FolderResponse {
     String createdAt;
 
     String updatedAt;
+
+    String timeSinceCreated;
 }

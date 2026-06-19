@@ -49,6 +49,8 @@ public class CloudinaryStorageService implements StorageService {
 
             Map uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
             return (String) uploadResult.get("secure_url");
+        } catch (RuntimeException exception) {
+            throw mapUploadException(exception);
         } catch (IOException exception) {
             throw new AppException(ErrorCode.UPLOAD_FAILED);
         }
@@ -124,6 +126,8 @@ public class CloudinaryStorageService implements StorageService {
             );
             Map uploadResult = cloudinary.uploader().upload(avatar.getBytes(), params);
             return (String) uploadResult.get("secure_url");
+        } catch (RuntimeException exception) {
+            throw mapAvatarUploadException(exception);
         } catch (IOException exception) {
             throw new AppException(ErrorCode.AVATAR_UPLOAD_FAILED);
         }
@@ -213,6 +217,27 @@ public class CloudinaryStorageService implements StorageService {
     }
 
     // Tách publicId từ URL Cloudinary bằng cách bỏ domain, version và đuôi mở rộng file.
+    private AppException mapUploadException(RuntimeException exception) {
+        if (isCloudinaryFileTooLarge(exception)) {
+            return new AppException(ErrorCode.FILE_TOO_LARGE);
+        }
+
+        return new AppException(ErrorCode.UPLOAD_FAILED);
+    }
+
+    private AppException mapAvatarUploadException(RuntimeException exception) {
+        if (isCloudinaryFileTooLarge(exception)) {
+            return new AppException(ErrorCode.AVATAR_SIZE_EXCEEDED);
+        }
+
+        return new AppException(ErrorCode.AVATAR_UPLOAD_FAILED);
+    }
+
+    private boolean isCloudinaryFileTooLarge(RuntimeException exception) {
+        String message = exception.getMessage();
+        return message != null && message.toLowerCase(Locale.ROOT).contains("file size too large");
+    }
+
     private String extractPublicId(String url) {
         if (url == null || url.isBlank() || !url.contains("upload/")) {
             return "";
@@ -242,7 +267,18 @@ public class CloudinaryStorageService implements StorageService {
 
     // Xác định resource_type Cloudinary cần dùng khi destroy/rename dựa trên URL và đuôi file.
     private String determinateResourceType(String url) {
-        if (url.contains("/raw/") || url.contains(".pdf") || url.contains(".docx") || url.contains(".xlsx") || url.contains(".zip")) {
+        if (url.contains("/raw/")
+                || url.contains(".pdf")
+                || url.contains(".docx")
+                || url.contains(".ppt")
+                || url.contains(".pptx")
+                || url.contains(".xls")
+                || url.contains(".xlsx")
+                || url.contains(".txt")
+                || url.contains(".csv")
+                || url.contains(".md")
+                || url.contains(".zip")
+                || url.contains(".rar")) {
             return "raw";
         }
         if (url.contains("/video/")) {

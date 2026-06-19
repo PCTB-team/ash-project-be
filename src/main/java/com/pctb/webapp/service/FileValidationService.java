@@ -31,21 +31,29 @@ public class FileValidationService {
 
     // Tập hợp các đuôi file mà hệ thống cho phép người dùng upload.
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "pdf", "docx", "png", "jpg", "jpeg", "txt", "mp3", "mp4", "ppt", "pptx"
+            "pdf", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "csv",
+            "jpg", "jpeg", "png", "zip", "rar", "svg", "md", "mp3", "mp4"
     );
 
     // Map từng đuôi file sang MIME type hợp lệ để ngăn client fake đuôi file.
-    private static final Map<String, Set<String>> ALLOWED_MIME_TYPES = Map.of(
-            "pdf", Set.of("application/pdf"),
-            "docx", Set.of("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-            "png", Set.of("image/png"),
-            "jpg", Set.of("image/jpeg"),
-            "jpeg", Set.of("image/jpeg"),
-            "txt", Set.of("text/plain"),
-            "mp3", Set.of("audio/mpeg"),
-            "mp4", Set.of("video/mp4"),
-            "ppt", Set.of("application/vnd.ms-powerpoint"),
-            "pptx", Set.of("application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    private static final Map<String, Set<String>> ALLOWED_MIME_TYPES = Map.ofEntries(
+            Map.entry("pdf", Set.of("application/pdf")),
+            Map.entry("docx", Set.of("application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+            Map.entry("ppt", Set.of("application/vnd.ms-powerpoint")),
+            Map.entry("pptx", Set.of("application/vnd.openxmlformats-officedocument.presentationml.presentation")),
+            Map.entry("xls", Set.of("application/vnd.ms-excel")),
+            Map.entry("xlsx", Set.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+            Map.entry("txt", Set.of("text/plain")),
+            Map.entry("csv", Set.of("text/csv", "application/csv", "text/plain")),
+            Map.entry("jpg", Set.of("image/jpeg")),
+            Map.entry("jpeg", Set.of("image/jpeg")),
+            Map.entry("png", Set.of("image/png")),
+            Map.entry("zip", Set.of("application/zip", "application/x-zip-compressed")),
+            Map.entry("rar", Set.of("application/vnd.rar", "application/x-rar-compressed")),
+            Map.entry("svg", Set.of("image/svg+xml")),
+            Map.entry("md", Set.of("text/markdown", "text/x-markdown", "text/plain")),
+            Map.entry("mp3", Set.of("audio/mpeg")),
+            Map.entry("mp4", Set.of("video/mp4"))
     );
 
     @Value("${app.upload.max-file-size}")
