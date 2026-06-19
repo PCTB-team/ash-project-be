@@ -14,28 +14,16 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupFileResponse {
-    String fileId;
+public class DocumentPreviewResponse {
+    String documentId;
 
     String fileName;
 
-    String mimeType;
-
-    Long fileSize;
-
-    String storageUrl;
+    String fileExtension;
 
     String previewUrl;
 
     String previewMode;
 
     Boolean previewSupported;
-
-    String uploadedBy;
-
-    String uploadedAt;
-
-    Boolean deleted;
-
-    String deletedAt;
 }

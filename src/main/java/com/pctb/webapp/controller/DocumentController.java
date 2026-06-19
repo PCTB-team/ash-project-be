@@ -3,6 +3,7 @@ package com.pctb.webapp.controller;
 import com.pctb.webapp.dto.request.UpdateDocumentRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
+import com.pctb.webapp.dto.response.DocumentPreviewResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
 import com.pctb.webapp.dto.response.FileSystemItemResponse;
@@ -143,6 +144,18 @@ public class DocumentController {
         DownloadDocumentResponse response = documentService.downloadMyDocument(documentId, authentication);
 
         return buildFileResponse(response, ContentDisposition.inline());
+    }
+
+    @Operation(summary = "Get current user document preview URL")
+    @GetMapping("/{documentId}/preview")
+    public ApiResponse<DocumentPreviewResponse> getMyDocumentPreview(
+            @PathVariable String documentId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<DocumentPreviewResponse>builder()
+                .message("Get document preview successfully")
+                .result(documentService.getMyDocumentPreview(documentId, authentication))
+                .build();
     }
 
     @Operation(summary = "Move current user document to trash")
