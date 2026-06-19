@@ -28,5 +28,5 @@ public class StoragePlan {
     Long quotaSize; // Dung lượng được cộng thêm vào tài khoản, tính bằng đơn vị Byte
 
     @Column(nullable = false)
-    Long price; // Giá tiền tương ứng của gói dịch vụ
+    Long price; // VND (long) // Giá tiền tương ứng của gói dịch vụ
 }

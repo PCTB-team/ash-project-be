@@ -49,10 +49,7 @@ public class PaymentService {
                 .orderCode(System.currentTimeMillis())
                 .user(user)
                 .plan(plan)
-
-                // ✅ FIX: amount phải là Long (VND)
-                .amount(plan.getPrice())
-
+                .amount(plan.getPrice().longValue())
                 .quotaAdded(plan.getQuotaSize())
                 .status(TransactionStatus.PENDING)
                 .idempotencyKey(idempotencyKey)

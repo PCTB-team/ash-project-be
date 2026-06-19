@@ -1,8 +1,6 @@
 package com.pctb.webapp.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.pctb.webapp.dto.request.PayOSWebhookRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CheckoutResponse;
 import com.pctb.webapp.entity.Transaction;
@@ -19,6 +17,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.webhooks.WebhookData;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/payment")
@@ -52,47 +51,48 @@ public class PaymentController {
                 .result(new CheckoutResponse(
                         tx.getId(),
                         res.getCheckoutUrl(),
-                        res.getAmount().intValue(),
+                        res.getAmount().longValue(),
                         res.getOrderCode()
                 ))
                 .build();
     }
 
     // =========================
-    // WEBHOOK (FIXED)
+    // WEBHOOK (FINAL FIX)
     // =========================
     @PostMapping("/webhook")
-    public ApiResponse<String> handleWebhook(@RequestBody PayOSWebhookRequest body) {
+    public ApiResponse<String> handleWebhook(@RequestBody String body) {
+
+        log.info("=================================");
+        log.info("PAYOS WEBHOOK RECEIVED");
+        log.info(body);
+        log.info("=================================");
 
         try {
-            log.info("PAYOS WEBHOOK: {}", body);
+            log.info("PAYOS WEBHOOK RAW: {}", body);
 
-            // convert DTO -> ObjectNode (để match PayOS SDK cũ)
             ObjectMapper mapper = new ObjectMapper();
-            ObjectNode node = mapper.valueToTree(body);
+            ObjectNode node = (ObjectNode) mapper.readTree(body);
 
             WebhookData data = payOSService.verifyWebhook(node);
+
+            log.info(
+                    "Webhook verified. orderCode={}, code={}",
+                    data.getOrderCode(),
+                    data.getCode()
+            );
 
             Long orderCode = Long.valueOf(data.getOrderCode().toString());
 
             Transaction tx = transactionRepo.findByOrderCode(orderCode)
                     .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
-            log.info("Webhook txId={}, status={}, code={}",
-                    tx.getId(), tx.getStatus(), data.getCode());
-
-            // =========================
-            // IDEMPOTENCY
-            // =========================
             if (tx.getStatus() != TransactionStatus.PENDING) {
                 return ApiResponse.<String>builder()
                         .result("IGNORED")
                         .build();
             }
 
-            // =========================
-            // PROCESS RESULT
-            // =========================
             if ("00".equals(data.getCode())) {
                 paymentService.processSuccessfulPayment(tx.getId());
             } else {
@@ -104,7 +104,6 @@ public class PaymentController {
                     .build();
 
         } catch (Exception e) {
-
             log.error("PAYOS WEBHOOK ERROR", e);
 
             return ApiResponse.<String>builder()
@@ -120,8 +119,10 @@ public class PaymentController {
     @GetMapping("/status/{id}")
     public ApiResponse<TransactionStatus> status(@PathVariable String id) {
 
+        Transaction tx = paymentService.getTransactionStatus(id);
+
         return ApiResponse.<TransactionStatus>builder()
-                .result(paymentService.getTransactionStatus(id).getStatus())
+                .result(tx.getStatus())
                 .build();
     }
 }
