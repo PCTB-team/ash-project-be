@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -57,11 +58,12 @@ public class GroupController {
     @Operation(summary = "Get my groups")
     @GetMapping("/my")
     public ApiResponse<List<GroupSummaryResponse>> getMyGroups(
+            @RequestParam(value = "keyword", required = false) String keyword,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<List<GroupSummaryResponse>>builder()
                 .message("Get my groups successfully")
-                .result(groupService.getMyGroups(authentication))
+                .result(groupService.getMyGroups(keyword, authentication))
                 .build();
     }
 
