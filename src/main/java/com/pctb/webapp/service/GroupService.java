@@ -96,6 +96,7 @@ public class GroupService {
      */
     @Transactional(readOnly = true)
     public List<GroupSummaryResponse> getMyGroups(
+            String keyword,
             JwtAuthenticationToken authentication
     ) {
         User currentUser = getCurrentUser(authentication);
@@ -114,10 +115,10 @@ public class GroupService {
                 .forEach(group -> {
                     if (addedGroupIds.add(group.getId())) {
                         responses.add(buildGroupSummaryResponse(group, null, currentUser));
-                    }
-                });
+                }
+            });
 
-        return responses;
+        return filterGroupsByKeyword(responses, keyword);
     }
 
     @Transactional
@@ -476,6 +477,28 @@ public class GroupService {
                 .canUpload(Boolean.TRUE.equals(member.getCanUpload()))
                 .joinedAt(member.getJoinedAt() == null ? null : member.getJoinedAt().toString())
                 .build();
+    }
+
+    private List<GroupSummaryResponse> filterGroupsByKeyword(
+            List<GroupSummaryResponse> groups,
+            String keyword
+    ) {
+        String normalizedKeyword = normalizeOptionalText(keyword);
+        if (normalizedKeyword == null) {
+            return groups;
+        }
+
+        String lowerKeyword = normalizedKeyword.toLowerCase();
+
+        return groups.stream()
+                .filter(group -> containsIgnoreCase(group.getName(), lowerKeyword)
+                        || containsIgnoreCase(group.getDescription(), lowerKeyword)
+                        || containsIgnoreCase(group.getOwnerName(), lowerKeyword))
+                .toList();
+    }
+
+    private boolean containsIgnoreCase(String value, String lowerKeyword) {
+        return value != null && value.toLowerCase().contains(lowerKeyword);
     }
 
     private String normalizeRequiredText(String value) {
