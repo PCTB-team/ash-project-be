@@ -4,6 +4,7 @@ import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.entity.GroupFile;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
+import com.pctb.webapp.entity.NotificationType;
 import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
@@ -23,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,6 +42,8 @@ public class GroupFileService {
     FileValidationService fileValidationService;
 
     StorageService storageService;
+
+    NotificationService notificationService;
 
     /**
      * Upload file into a group.
@@ -100,6 +104,20 @@ public class GroupFileService {
 
         groupFile = groupFileRepo.save(groupFile);
 
+        // Bao cho cac thanh vien khac biet co file moi trong group.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                NotificationType.GROUP_FILE_UPLOADED,
+                "Tai lieu moi trong nhom",
+                currentUser.getFullname() + " da tai len \"" + groupFile.getFileName()
+                        + "\" trong nhom \"" + group.getName() + "\".",
+                NotificationType.GROUP_FILE,
+                groupFile.getId(),
+                groupFile.getFileName(),
+                Set.of(currentUser.getId())
+        );
+
         return buildGroupFileResponse(groupFile);
     }
 
@@ -151,6 +169,20 @@ public class GroupFileService {
         groupFile.setDeleted(true);
         groupFile.setDeletedAt(LocalDateTime.now());
         groupFileRepo.save(groupFile);
+
+        // Bao cho cac thanh vien khac biet file da duoc dua vao thung rac.
+        notificationService.createForGroupMembers(
+                groupFile.getGroup(),
+                currentUser,
+                NotificationType.GROUP_FILE_MOVED_TO_TRASH,
+                "Tai lieu da bi xoa",
+                "\"" + groupFile.getFileName() + "\" da duoc chuyen vao thung rac trong nhom \""
+                        + groupFile.getGroup().getName() + "\".",
+                NotificationType.GROUP_FILE,
+                groupFile.getId(),
+                groupFile.getFileName(),
+                Set.of(currentUser.getId())
+        );
     }
 
     /**
@@ -173,7 +205,21 @@ public class GroupFileService {
         groupFile.setDeleted(false);
         groupFile.setDeletedAt(null);
 
-        return buildGroupFileResponse(groupFileRepo.save(groupFile));
+        GroupFile savedFile = groupFileRepo.save(groupFile);
+        notificationService.createForGroupMembers(
+                savedFile.getGroup(),
+                currentUser,
+                NotificationType.GROUP_FILE_RESTORED,
+                "Tai lieu da duoc khoi phuc",
+                "\"" + savedFile.getFileName() + "\" da duoc khoi phuc trong nhom \""
+                        + savedFile.getGroup().getName() + "\".",
+                NotificationType.GROUP_FILE,
+                savedFile.getId(),
+                savedFile.getFileName(),
+                Set.of(currentUser.getId())
+        );
+
+        return buildGroupFileResponse(savedFile);
     }
 
     private User getCurrentUser(JwtAuthenticationToken authentication) {
