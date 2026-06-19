@@ -6,6 +6,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.xml.sax.ContentHandler;
@@ -13,6 +14,7 @@ import org.xml.sax.ContentHandler;
 import java.util.Set;
 
 @Service
+@Lazy
 public class DocumentTextExtractorService {
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 20000;
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("pdf", "docx", "txt", "ppt", "pptx");
