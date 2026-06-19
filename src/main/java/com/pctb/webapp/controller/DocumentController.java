@@ -5,6 +5,7 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.DeleteDocumentResponse;
 import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.DownloadDocumentResponse;
+import com.pctb.webapp.dto.response.FileSystemItemResponse;
 import com.pctb.webapp.dto.response.FilteredDocumentResponse;
 import com.pctb.webapp.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,6 +58,20 @@ public class DocumentController {
         return ApiResponse.<Page<DocumentResponse>>builder()
                 .message("Get documents successfully")
                 .result(documentService.getMyDocumentsPage(authentication, page, size, folderId))
+                .build();
+    }
+
+    @Operation(summary = "Get current user files and folders by page")
+    @GetMapping("/items")
+    public ApiResponse<Page<FileSystemItemResponse>> getMyFileSystemItemsPage(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "folderId", required = false) String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<Page<FileSystemItemResponse>>builder()
+                .message("Get files and folders successfully")
+                .result(documentService.getMyFileSystemItemsPage(authentication, page, size, folderId))
                 .build();
     }
 
