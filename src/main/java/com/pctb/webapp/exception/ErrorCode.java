@@ -288,7 +288,10 @@ public enum ErrorCode {
 
     PAYMENT_GATEWAY_ERROR(1506, "Không thể kết nối cổng thanh toán PayOS", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    INVALID_SIGNATURE(1507, "Chữ ký webhook không hợp lệ", HttpStatus.UNAUTHORIZED);
+    INVALID_SIGNATURE(1507, "Chữ ký webhook không hợp lệ", HttpStatus.UNAUTHORIZED),
+
+    // Thêm mã lỗi chặn nâng cấp lùi/trùng gói tại đây:
+    PLAN_LEVEL_LOW(1508, "Bạn chỉ có thể nâng cấp lên gói có dung lượng cao hơn gói hiện tại!", HttpStatus.BAD_REQUEST);
 
     private final int code;
 

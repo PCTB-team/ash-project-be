@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface UserRepo extends JpaRepository<User, String> {
@@ -30,4 +31,22 @@ public interface UserRepo extends JpaRepository<User, String> {
 
     // Đếm user tạo sau một thời điểm nhất định
     long countByCreatedAtAfter(LocalDateTime startDateTime);
+
+    // --- ĐÃ ĐỒNG BỘ: TRÁNH CONFLICT TÊN FIELD DUNG LƯỢNG ---
+
+    // 1. Tính tổng dung lượng ĐÃ DÙNG toàn hệ thống (Dùng storageUsed gốc)
+    @Query("SELECT COALESCE(SUM(u.storageUsed), 0) FROM User u")
+    long sumTotalUsedStorage();
+
+    // 2. Tính tổng dung lượng CẤU HÌNH TỐI ĐA toàn hệ thống (Dùng storageQuota gốc)
+    @Query("SELECT COALESCE(SUM(u.storageQuota), 0) FROM User u")
+    long sumTotalMaxStorage();
+
+    // 3. Lấy danh sách top người dùng tiêu tốn dung lượng nhất hệ thống
+    @Query("SELECT u FROM User u ORDER BY u.storageUsed DESC")
+    List<User> findTopUsersByStorage(Pageable pageable);
+
+    // Thêm hàm này để Spring Data JPA tự động tạo câu lệnh SQL tìm kiếm các user hết hạn
+    List<User> findByStorageExpiredAtBefore(LocalDateTime dateTime);
+
 }

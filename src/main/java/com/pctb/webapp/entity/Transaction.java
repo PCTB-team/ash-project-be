@@ -22,7 +22,7 @@ public class Transaction {
     @Id
     private String id;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "order_code")
     private Long orderCode;
 
     @ManyToOne(fetch = FetchType.LAZY)

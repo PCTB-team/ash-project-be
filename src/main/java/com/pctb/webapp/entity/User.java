@@ -72,11 +72,16 @@ public class User {
         }
     }
 
-    // === PHẦN QUẢN LÝ DUNG LƯỢNG VIP ===
-    @Column(nullable = false)
-    Long storageQuota = 5368709120L; // Hạn mức mặc định ban đầu là 5GB (= 5 * 1024 * 1024 * 1024 bytes)
+    // =========================================================================
+    // PHẦN QUẢN LÝ DUNG LƯỢNG VIP VÀ THỜI HẠN (GIỮ DUY NHẤT CẶP NÀY)
+    // =========================================================================
+    @Column(name = "storage_quota", nullable = false)
+    Long storageQuota = 524288000L; // Mặc định ban đầu là 500MB (Tính bằng Byte)
 
-    @Column(nullable = false)
-    Long storageUsed = 0L; // Dung lượng thực tế user đã sài
+    @Column(name = "storage_used", nullable = false)
+    Long storageUsed = 0L; // Dung lượng thực tế đã dùng khởi tạo bằng 0 (Tính bằng Byte)
 
+    @Column(name = "storage_expired_at")
+    LocalDateTime storageExpiredAt; // null nghĩa là đang dùng gói mặc định vĩnh viễn
 }
+

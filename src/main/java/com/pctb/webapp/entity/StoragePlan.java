@@ -29,4 +29,10 @@ public class StoragePlan {
 
     @Column(nullable = false)
     Long price; // VND (long) // Giá tiền tương ứng của gói dịch vụ
+
+    // =========================================================================
+    // KHU VỰC BỔ SUNG: THỜI GIAN HIỆU LỰC CỦA GÓI (TÍNH THEO THÁNG)
+    // =========================================================================
+    @Column(name = "duration_months", nullable = false)
+    Integer durationMonths; // Số tháng hiệu lực (VD: 1 cho 1 tháng, 12 cho 1 năm)
 }

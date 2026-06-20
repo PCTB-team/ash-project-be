@@ -1,4 +1,5 @@
 package com.pctb.webapp.configuration;
+
 import com.pctb.webapp.entity.Role;
 import com.pctb.webapp.entity.RoleEnum;
 import com.pctb.webapp.entity.StoragePlan;
@@ -22,13 +23,13 @@ import java.util.Set;
 @Configuration
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-
-// Class dùng để tạo account admin khi chạy
 public class InitConfig {
+
+    // Sử dụng cơ chế Lombok @RequiredArgsConstructor để tự động inject qua Constructor
     final UserRepo userRepo;
     final RoleRepo roleRepo;
     final PasswordEncoder passwordEncoder;
-    final StoragePlanRepo planRepo; // Khai báo thêm để gọi tầng lưu gói dịch vụ
+    final StoragePlanRepo planRepo; // Sử dụng trường thuộc tính này xuyên suốt class để hết báo vàng
 
     @Value("${app.admin.username}")
     String adminUsername;
@@ -42,10 +43,10 @@ public class InitConfig {
     @Value("${app.admin.fullname}")
     String adminFullname;
 
-    // Khi app bắt đầu chạy sẽ khởi tạo account admin đã được quy định username, password trong env
     @Bean
     CommandLineRunner initAdminAccount() {
-        return args -> {
+        // Dùng dấu gạch dưới "_" hoặc @SuppressWarnings để báo cho IntelliJ biết không cần check "args"
+        return _ -> {
             Role adminRole = roleRepo.findById(RoleEnum.ADMIN.name())
                     .orElseGet(() -> roleRepo.save(
                             new Role(RoleEnum.ADMIN.name(), "Admin role")
@@ -71,53 +72,90 @@ public class InitConfig {
                     .password(passwordEncoder.encode(adminPassword))
                     .fullname(adminFullname)
                     .verified(true)
-                    .storageQuota(5368709120L) // Đồng bộ tránh lỗi null bộ nhớ cho Admin
+                    .storageQuota(524288000L) // Đồng bộ mặc định ban đầu là 500MB
                     .storageUsed(0L)
                     .roles(Set.of(adminRole))
                     .build();
 
             userRepo.save(admin);
-
             System.out.println("Admin account created: " + adminEmail);
-
-
         };
     }
 
     @Bean
     CommandLineRunner initStoragePlans() {
-        return args -> {
-
+        // Sử dụng trường "planRepo" của class để tránh conflict tham số hàm
+        return _ -> {
             if (planRepo.count() > 0) {
-                return;
+                return; // Nếu đã có gói cước trong DB thì không ghi đè
             }
 
-            StoragePlan plan5gb = StoragePlan.builder()
-                    .id("PLAN_5GB")
-                    .planName("Gói Tăng Tốc Bộ Nhớ 5GB")
-                    .quotaSize(5L * 1024 * 1024 * 1024)
+            // =========================================================================
+            // GÓI GO - HẠN MỨC 2GB (2 * 1024 * 1024 * 1024 Bytes)
+            // =========================================================================
+            StoragePlan planGo1Month = StoragePlan.builder()
+                    .id("PLAN_GO_1M")
+                    .planName("Gói GO - 1 Tháng (Hạn mức 2GB)")
+                    .quotaSize(2L * 1024 * 1024 * 1024)
                     .price(2000L)
+                    .durationMonths(1)
                     .build();
 
-            StoragePlan plan10gb = StoragePlan.builder()
-                    .id("PLAN_10GB")
-                    .planName("Gói Mở Rộng Bộ Nhớ 10GB")
+            StoragePlan planGo1Year = StoragePlan.builder()
+                    .id("PLAN_GO_1Y")
+                    .planName("Gói GO - 1 Năm (Hạn mức 2GB) [Ưu đãi]")
+                    .quotaSize(2L * 1024 * 1024 * 1024)
+                    .price(20000L)
+                    .durationMonths(12)
+                    .build();
+
+            // =========================================================================
+            // GÓI PLUS - HẠN MỨC 5GB (5 * 1024 * 1024 * 1024 Bytes)
+            // =========================================================================
+            StoragePlan planPlus1Month = StoragePlan.builder()
+                    .id("PLAN_PLUS_1M")
+                    .planName("Gói PLUS - 1 Tháng (Hạn mức 5GB)")
+                    .quotaSize(5L * 1024 * 1024 * 1024)
+                    .price(5000L)
+                    .durationMonths(1)
+                    .build();
+
+            StoragePlan planPlus1Year = StoragePlan.builder()
+                    .id("PLAN_PLUS_1Y")
+                    .planName("Gói PLUS - 1 Năm (Hạn mức 5GB) [Ưu đãi]")
+                    .quotaSize(5L * 1024 * 1024 * 1024)
+                    .price(50000L)
+                    .durationMonths(12)
+                    .build();
+
+            // =========================================================================
+            // GÓI PRO - HẠN MỨC 10GB (10 * 1024 * 1024 * 1024 Bytes)
+            // =========================================================================
+            StoragePlan planPro1Month = StoragePlan.builder()
+                    .id("PLAN_PRO_1M")
+                    .planName("Gói PRO - 1 Tháng (Hạn mức 10GB)")
                     .quotaSize(10L * 1024 * 1024 * 1024)
-                    .price(3000L)
+                    .price(10000L)
+                    .durationMonths(1)
                     .build();
 
-            StoragePlan plan50gb = StoragePlan.builder()
-                    .id("PLAN_50GB")
-                    .planName("Gói Dung Lượng Khổng Lồ 50GB")
-                    .quotaSize(50L * 1024 * 1024 * 1024)
-                    .price(4000L)
+            StoragePlan planPro1Year = StoragePlan.builder()
+                    .id("PLAN_PRO_1Y")
+                    .planName("Gói PRO - 1 Năm (Hạn mức 10GB) [Ưu đãi]")
+                    .quotaSize(10L * 1024 * 1024 * 1024)
+                    .price(100000L)
+                    .durationMonths(12)
                     .build();
 
-            planRepo.save(plan5gb);
-            planRepo.save(plan10gb);
-            planRepo.save(plan50gb);
+            // Lưu toàn bộ 6 gói cước một cách hợp lệ vào DB qua trường thuộc tính "planRepo" của class
+            planRepo.save(planGo1Month);
+            planRepo.save(planGo1Year);
+            planRepo.save(planPlus1Month);
+            planRepo.save(planPlus1Year);
+            planRepo.save(planPro1Month);
+            planRepo.save(planPro1Year);
 
-            log.info("[SWP391] Storage plans seeded successfully");
+            log.info("[SWP391] Hệ thống cước VIP (GO, PLUS, PRO) gồm 6 gói đã được đồng bộ thành công!");
         };
     }
 }

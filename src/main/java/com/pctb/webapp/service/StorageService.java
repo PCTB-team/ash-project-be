@@ -1,18 +1,21 @@
 package com.pctb.webapp.service;
 
+import com.pctb.webapp.entity.User;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface StorageService {
-    // Upload file lên hệ thống lưu trữ và trả về URL/path để lưu vào database.
+    // Hàm cũ (Giữ nguyên để tránh gãy code các luồng khác nếu có)
     String upload(MultipartFile file, String fileName);
 
-    // Xóa file khỏi hệ thống lưu trữ dựa trên URL/path đã lưu.
+    // =========================================================================
+    // 🟢 BỔ SUNG DÒNG NÀY VÀO INTERFACE CỦA BẠN
+    // =========================================================================
+    String upload(MultipartFile file, String fileName, User user);
+
     void delete(String storageUrl);
 
-    // Đổi tên file trong storage và trả về URL/path mới sau khi đổi tên.
     String rename(String oldStorageUrl, String newFileName);
 
-    // Tải file thành Resource để controller có thể trả nội dung file cho client.
     Resource loadAsResource(String storageUrl);
 }
