@@ -40,6 +40,8 @@ public class DocumentUploadService {
 
     StorageService storageService;
 
+    DocumentIndexingService documentIndexingService;
+
     @Value("${app.upload.max-user-storage}")
     @NonFinal
     long maxUserStorage;
@@ -102,6 +104,12 @@ public class DocumentUploadService {
 
         document = documentRepo.save(document);
         updateFolderSizeCascade(folder, file.getSize());
+
+        try {
+            documentIndexingService.indexDocument(document.getId());
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())

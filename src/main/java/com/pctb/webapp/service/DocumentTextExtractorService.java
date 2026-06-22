@@ -7,6 +7,7 @@ import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.xml.sax.ContentHandler;
@@ -47,6 +48,27 @@ public class DocumentTextExtractorService {
             }
 
             return text;
+        } catch (AppException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        }
+    }
+
+    public String extractForIndexing(Resource resource, String originalFileName) {
+        try {
+            ContentHandler handler = new BodyContentHandler(-1);
+            Metadata metadata = new Metadata();
+            metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, originalFileName);
+
+            parser.parse(resource.getInputStream(), handler, metadata);
+            String text = handler.toString();
+
+            if (text == null || text.isBlank()) {
+                throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+            }
+
+            return text.replaceAll("\\s+", " ").trim();
         } catch (AppException exception) {
             throw exception;
         } catch (Exception exception) {

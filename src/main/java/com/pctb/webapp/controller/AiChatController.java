@@ -1,6 +1,8 @@
 package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.AiChatRequest;
+import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
+import com.pctb.webapp.dto.response.AiDocumentChatResponse;
 import com.pctb.webapp.dto.response.AiChatResponse;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.service.AiChatService;
@@ -13,6 +15,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +38,19 @@ public class AiChatController {
                 .result(AiChatResponse.builder()
                         .answer(aiChatService.chat(request.getMessage()))
                         .build())
+                .build();
+    }
+
+    // Endpoint chat theo phạm vi tài liệu đã lưu của user.
+    @Operation(summary = "Chat with AI using user's stored knowledge scope")
+    @PostMapping("/knowledge/chat")
+    public ApiResponse<AiDocumentChatResponse> chatWithKnowledge(
+            @RequestBody @Valid AiKnowledgeChatRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<AiDocumentChatResponse>builder()
+                .message("Chat with knowledge successfully")
+                .result(aiChatService.chatWithKnowledge(request, authentication))
                 .build();
     }
 
