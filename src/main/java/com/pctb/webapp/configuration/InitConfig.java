@@ -87,37 +87,40 @@ public class InitConfig {
     @Bean
     CommandLineRunner initStoragePlans() {
         return args -> {
+            if (planRepo.count() > 0) return;
 
-            if (planRepo.count() > 0) {
-                return;
-            }
+            // --- HỆ THỐNG GÓI BẬC THANG: GO (2GB) ---
+            StoragePlan planGo1M = StoragePlan.builder()
+                    .id("PLAN_GO_1M").planName("Gói GO - 1 Tháng (Hạn mức 2GB)")
+                    .quotaSize(2L * 1024 * 1024 * 1024).price(2000L).durationMonths(1).build();
 
-            StoragePlan plan5gb = StoragePlan.builder()
-                    .id("PLAN_5GB")
-                    .planName("Gói Tăng Tốc Bộ Nhớ 5GB")
-                    .quotaSize(5L * 1024 * 1024 * 1024)
-                    .price(2000L)
-                    .build();
+            StoragePlan planGo1Y = StoragePlan.builder()
+                    .id("PLAN_GO_1Y").planName("Gói GO - 1 Năm (Hạn mức 2GB) [Ưu đãi]")
+                    .quotaSize(2L * 1024 * 1024 * 1024).price(20000L).durationMonths(12).build();
 
-            StoragePlan plan10gb = StoragePlan.builder()
-                    .id("PLAN_10GB")
-                    .planName("Gói Mở Rộng Bộ Nhớ 10GB")
-                    .quotaSize(10L * 1024 * 1024 * 1024)
-                    .price(3000L)
-                    .build();
+            // --- HỆ THỐNG GÓI BẬC THANG: PLUS (5GB) ---
+            StoragePlan planPlus1M = StoragePlan.builder()
+                    .id("PLAN_PLUS_1M").planName("Gói PLUS - 1 Tháng (Hạn mức 5GB)")
+                    .quotaSize(5L * 1024 * 1024 * 1024).price(5000L).durationMonths(1).build();
 
-            StoragePlan plan50gb = StoragePlan.builder()
-                    .id("PLAN_50GB")
-                    .planName("Gói Dung Lượng Khổng Lồ 50GB")
-                    .quotaSize(50L * 1024 * 1024 * 1024)
-                    .price(4000L)
-                    .build();
+            StoragePlan planPlus1Y = StoragePlan.builder()
+                    .id("PLAN_PLUS_1Y").planName("Gói PLUS - 1 Năm (Hạn mức 5GB) [Ưu đãi]")
+                    .quotaSize(5L * 1024 * 1024 * 1024).price(50000L).durationMonths(12).build();
 
-            planRepo.save(plan5gb);
-            planRepo.save(plan10gb);
-            planRepo.save(plan50gb);
+            // --- HỆ THỐNG GÓI BẬC THANG: PRO (10GB) ---
+            StoragePlan planPro1M = StoragePlan.builder()
+                    .id("PLAN_PRO_1M").planName("Gói PRO - 1 Tháng (Hạn mức 10GB)")
+                    .quotaSize(10L * 1024 * 1024 * 1024).price(10000L).durationMonths(1).build();
 
-            log.info("[SWP391] Storage plans seeded successfully");
+            StoragePlan planPro1Y = StoragePlan.builder()
+                    .id("PLAN_PRO_1Y").planName("Gói PRO - 1 Năm (Hạn mức 10GB) [Ưu đãi]")
+                    .quotaSize(10L * 1024 * 1024 * 1024).price(100000L).durationMonths(12).build();
+
+            planRepo.save(planGo1M); planRepo.save(planGo1Y);
+            planRepo.save(planPlus1M); planRepo.save(planPlus1Y);
+            planRepo.save(planPro1M); planRepo.save(planPro1Y);
+
+            log.info("[SWP391] Hệ thống 6 gói cước bậc thang đã khởi tạo thành công.");
         };
     }
 }

@@ -3,6 +3,8 @@ package com.pctb.webapp.controller;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CheckoutResponse;
+import com.pctb.webapp.dto.response.UserStorageResponse;
+import com.pctb.webapp.entity.StoragePlan;
 import com.pctb.webapp.entity.Transaction;
 import com.pctb.webapp.entity.TransactionStatus;
 import com.pctb.webapp.exception.AppException;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.webhooks.WebhookData;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/payment")
@@ -38,7 +42,6 @@ public class PaymentController {
             @RequestParam String planId,
             @RequestHeader("Idempotency-Key") String idempotencyKey
     ) {
-
         Transaction tx = paymentService.createPaymentIntent(
                 jwt.getSubject(),
                 planId,
@@ -62,25 +65,11 @@ public class PaymentController {
     // =========================
     @PostMapping("/webhook")
     public ApiResponse<String> handleWebhook(@RequestBody String body) {
-
-        log.info("=================================");
-        log.info("PAYOS WEBHOOK RECEIVED");
-        log.info(body);
-        log.info("=================================");
-
         try {
-            log.info("PAYOS WEBHOOK RAW: {}", body);
-
             ObjectMapper mapper = new ObjectMapper();
             ObjectNode node = (ObjectNode) mapper.readTree(body);
 
             WebhookData data = payOSService.verifyWebhook(node);
-
-            log.info(
-                    "Webhook verified. orderCode={}, code={}",
-                    data.getOrderCode(),
-                    data.getCode()
-            );
 
             Long orderCode = Long.valueOf(data.getOrderCode().toString());
 
@@ -88,9 +77,7 @@ public class PaymentController {
                     .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
             if (tx.getStatus() != TransactionStatus.PENDING) {
-                return ApiResponse.<String>builder()
-                        .result("IGNORED")
-                        .build();
+                return ApiResponse.<String>builder().result("IGNORED").build();
             }
 
             if ("00".equals(data.getCode())) {
@@ -99,17 +86,11 @@ public class PaymentController {
                 paymentService.processFailedPayment(tx.getId());
             }
 
-            return ApiResponse.<String>builder()
-                    .result("OK")
-                    .build();
+            return ApiResponse.<String>builder().result("OK").build();
 
         } catch (Exception e) {
             log.error("PAYOS WEBHOOK ERROR", e);
-
-            return ApiResponse.<String>builder()
-                    .result("ERROR")
-                    .message(e.getMessage())
-                    .build();
+            return ApiResponse.<String>builder().result("ERROR").message(e.getMessage()).build();
         }
     }
 
@@ -118,11 +99,25 @@ public class PaymentController {
     // =========================
     @GetMapping("/status/{id}")
     public ApiResponse<TransactionStatus> status(@PathVariable String id) {
-
         Transaction tx = paymentService.getTransactionStatus(id);
+        return ApiResponse.<TransactionStatus>builder().result(tx.getStatus()).build();
+    }
 
-        return ApiResponse.<TransactionStatus>builder()
-                .result(tx.getStatus())
-                .build();
+    // =========================================================================
+    // TIỆN ÍCH USER: LẤY DANH SÁCH GÓI VIP ĐƯỢC PHÉP NÂNG CẤP (ẨN CÁC GÓI THẤP HƠN)
+    // =========================================================================
+    @GetMapping("/available-plans")
+    public ApiResponse<List<StoragePlan>> getAvailablePlans(@AuthenticationPrincipal Jwt jwt) {
+        List<StoragePlan> plans = paymentService.getAvailablePlansForUser(jwt.getSubject());
+        return ApiResponse.<List<StoragePlan>>builder().result(plans).build();
+    }
+
+    // =========================================================================
+    // TIỆN ÍCH USER: XEM THÔNG TIN DUNG LƯỢNG THỰC TẾ ĐÃ SỬ DỤNG VÀ THỜI HẠN GÓI
+    // =========================================================================
+    @GetMapping("/my-storage")
+    public ApiResponse<UserStorageResponse> getMyStorageDetails(@AuthenticationPrincipal Jwt jwt) {
+        UserStorageResponse storageDetails = paymentService.getMyStorageDetails(jwt.getSubject());
+        return ApiResponse.<UserStorageResponse>builder().result(storageDetails).build();
     }
 }
