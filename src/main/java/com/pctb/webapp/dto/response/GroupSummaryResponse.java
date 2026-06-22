@@ -31,6 +31,8 @@ public class GroupSummaryResponse {
 
     Boolean canUpload;
 
+    Boolean canChat;
+
     Boolean inviteEnabled;
 
     String inviteLink;

@@ -1,9 +1,13 @@
 package com.pctb.webapp.controller;
 
+import com.pctb.webapp.dto.request.SaveGroupFileToDashboardRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
+import com.pctb.webapp.dto.response.DocumentResponse;
+import com.pctb.webapp.dto.response.DeleteGroupFileResponse;
 import com.pctb.webapp.dto.response.GroupFileResponse;
 import com.pctb.webapp.service.GroupFileService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,6 +68,23 @@ public class GroupFileController {
     }
 
     /**
+     * Member saves a group file into personal dashboard.
+     */
+    @Operation(summary = "Save group file to my dashboard")
+    @PostMapping("/{groupId}/files/{fileId}/save-to-dashboard")
+    public ApiResponse<DocumentResponse> saveFileToDashboard(
+            @PathVariable String groupId,
+            @PathVariable String fileId,
+            @RequestBody(required = false) @Valid SaveGroupFileToDashboardRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<DocumentResponse>builder()
+                .message("Save group file to dashboard successfully")
+                .result(groupFileService.saveFileToDashboard(groupId, fileId, request, authentication))
+                .build();
+    }
+
+    /**
      * Leader moves a group file to trash.
      */
     @Operation(summary = "Move group file to trash")
@@ -77,6 +99,22 @@ public class GroupFileController {
         return ApiResponse.<String>builder()
                 .message("Move group file to trash successfully")
                 .result("DELETED")
+                .build();
+    }
+
+    /**
+     * Leader permanently deletes a group file from trash.
+     */
+    @Operation(summary = "Delete group file permanently")
+    @DeleteMapping("/{groupId}/files/{fileId}/permanent")
+    public ApiResponse<DeleteGroupFileResponse> deleteFilePermanently(
+            @PathVariable String groupId,
+            @PathVariable String fileId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<DeleteGroupFileResponse>builder()
+                .message("Delete group file permanently successfully")
+                .result(groupFileService.deleteFilePermanently(groupId, fileId, authentication))
                 .build();
     }
 

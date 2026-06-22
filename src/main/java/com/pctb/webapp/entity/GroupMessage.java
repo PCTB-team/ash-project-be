@@ -2,16 +2,14 @@ package com.pctb.webapp.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +21,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * Luu quan he user - group, kem role va quyen upload.
+ * Luu tung tin nhan thao luan trong group.
  */
 @Entity
 @Getter
@@ -32,11 +30,11 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(
-        name = "group_member",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"group_id", "user_id"})
+        name = "group_message",
+        indexes = @Index(name = "idx_group_message_group_created_at", columnList = "group_id, created_at")
 )
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMember {
+public class GroupMessage {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     String id;
@@ -46,20 +44,12 @@ public class GroupMember {
     StudyGroup group;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    User user;
+    @JoinColumn(name = "sender_id", nullable = false)
+    User sender;
 
-    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 1000)
+    String content;
+
     @Column(nullable = false)
-    GroupRole role;
-
-    @Builder.Default
-    @Column(nullable = false)
-    Boolean canUpload = false;
-
-    @Builder.Default
-    @Column(nullable = false)
-    Boolean canChat = true;
-
-    LocalDateTime joinedAt;
+    LocalDateTime createdAt;
 }
