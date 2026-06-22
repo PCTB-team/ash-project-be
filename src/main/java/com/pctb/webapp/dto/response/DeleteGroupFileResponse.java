@@ -14,24 +14,10 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMemberResponse {
-    String memberId;
+public class DeleteGroupFileResponse {
+    String fileId;
 
-    String userId;
+    String fileName;
 
-    String username;
-
-    String fullname;
-
-    String email;
-
-    String avatarUrl;
-
-    String role;
-
-    Boolean canUpload;
-
-    Boolean canChat;
-
-    String joinedAt;
+    Boolean deletedPermanently;
 }

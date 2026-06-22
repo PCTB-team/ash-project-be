@@ -13,6 +13,9 @@ public interface StorageService {
     // Đổi tên file trong storage và trả về URL/path mới sau khi đổi tên.
     String rename(String oldStorageUrl, String newFileName);
 
+    // Copy file dang co trong storage sang vi tri moi va tra ve URL/path moi.
+    String copy(String sourceStorageUrl, String newFileName);
+
     // Tải file thành Resource để controller có thể trả nội dung file cho client.
     Resource loadAsResource(String storageUrl);
 }

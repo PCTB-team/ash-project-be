@@ -251,6 +251,16 @@ public enum ErrorCode {
 
     GROUP_LEADER_CANNOT_LEAVE(1235, "Group leader cannot leave group", HttpStatus.BAD_REQUEST),
 
+    GROUP_MESSAGE_EMPTY(1236, "Group message must not be empty", HttpStatus.BAD_REQUEST),
+
+    GROUP_MESSAGE_TOO_LONG(1237, "Group message is too long", HttpStatus.BAD_REQUEST),
+
+    GROUP_LEADER_PERMISSION_REQUIRED(1238, "Chỉ trưởng nhóm mới có quyền này", HttpStatus.FORBIDDEN),
+
+    GROUP_CHAT_NOT_ALLOWED(1239, "Bạn không được phép chat trong nhóm này", HttpStatus.FORBIDDEN),
+
+    GROUP_LEADER_CANNOT_BE_MUTED(1240, "Không thể cấm chat trưởng nhóm", HttpStatus.BAD_REQUEST),
+
     FOLDER_NAME_REQUIRED(1318, "Yêu cầu tên thư mục", HttpStatus.BAD_REQUEST),
 
     FOLDER_NAME_INVALID(1319, "Tên thư mục không hợp lệ", HttpStatus.BAD_REQUEST),

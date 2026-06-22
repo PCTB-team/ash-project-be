@@ -92,6 +92,28 @@ public class CloudinaryStorageService implements StorageService {
     // Cloudinary trả file bằng HTTPS URL trực tiếp nên backend không cần load thành Resource như local storage.
     @Override
     // Không dùng cho Cloudinary vì client có thể truy cập file qua HTTPS URL trực tiếp.
+    public String copy(String sourceStorageUrl, String newFileName) {
+        if (sourceStorageUrl == null || sourceStorageUrl.isBlank()) {
+            throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        try {
+            String resourceType = determineUploadResourceType(newFileName);
+            String publicId = buildUploadPublicId(newFileName, resourceType);
+            Map params = ObjectUtils.asMap(
+                    "public_id", publicId,
+                    "resource_type", resourceType,
+                    "overwrite", true
+            );
+
+            Map uploadResult = cloudinary.uploader().upload(sourceStorageUrl, params);
+            return (String) uploadResult.get("secure_url");
+        } catch (IOException | RuntimeException exception) {
+            throw new AppException(ErrorCode.UPLOAD_FAILED);
+        }
+    }
+
+    @Override
     public Resource loadAsResource(String storageUrl) {
         if (storageUrl == null || storageUrl.isBlank()) {
             throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);

@@ -2,11 +2,13 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.CreateGroupRequest;
 import com.pctb.webapp.dto.request.JoinGroupRequest;
+import com.pctb.webapp.dto.request.UpdateChatPermissionRequest;
 import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
+import com.pctb.webapp.dto.response.GroupPageResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.entity.GroupMember;
@@ -24,6 +26,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -32,8 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -87,6 +90,7 @@ public class GroupService {
                 .user(currentUser)
                 .role(GroupRole.LEADER)
                 .canUpload(true)
+                .canChat(true)
                 .joinedAt(now)
                 .build();
         groupMemberRepo.save(leaderMember);
@@ -98,30 +102,40 @@ public class GroupService {
      * Lay cac group ma user dang dang nhap dang tham gia hoac dang lam leader.
      */
     @Transactional(readOnly = true)
-    public List<GroupSummaryResponse> getMyGroups(
+    public GroupPageResponse getMyGroups(
             String keyword,
+            int page,
+            int size,
             JwtAuthenticationToken authentication
     ) {
         User currentUser = getCurrentUser(authentication);
-        List<GroupSummaryResponse> responses = new ArrayList<>();
-        Set<String> addedGroupIds = new HashSet<>();
+        Pageable pageable = PageRequest.of(normalizePage(page), normalizePageSize(size));
+        String normalizedKeyword = normalizeOptionalText(keyword);
 
-        groupMemberRepo.findByUserIdOrderByJoinedAtDesc(currentUser.getId())
-                .forEach(member -> {
-                    StudyGroup group = member.getGroup();
-                    if (addedGroupIds.add(group.getId())) {
-                        responses.add(buildGroupSummaryResponse(group, member, currentUser));
-                    }
-                });
+        // Query co phan trang de man danh sach group chi load dung so luong FE can hien thi.
+        Page<StudyGroup> groupPage = studyGroupRepo.findMyGroups(
+                currentUser.getId(),
+                normalizedKeyword,
+                pageable
+        );
 
-        studyGroupRepo.findByOwnerIdOrderByCreatedAtDesc(currentUser.getId())
-                .forEach(group -> {
-                    if (addedGroupIds.add(group.getId())) {
-                        responses.add(buildGroupSummaryResponse(group, null, currentUser));
-                }
-            });
+        List<GroupSummaryResponse> groups = groupPage.getContent().stream()
+                .map(group -> {
+                    GroupMember member = groupMemberRepo
+                            .findByGroupIdAndUserId(group.getId(), currentUser.getId())
+                            .orElse(null);
 
-        return filterGroupsByKeyword(responses, keyword);
+                    return buildGroupSummaryResponse(group, member, currentUser);
+                })
+                .toList();
+
+        return GroupPageResponse.builder()
+                .items(groups)
+                .page(groupPage.getNumber())
+                .size(groupPage.getSize())
+                .totalElements(groupPage.getTotalElements())
+                .totalPages(groupPage.getTotalPages())
+                .build();
     }
 
     @Transactional
@@ -173,6 +187,7 @@ public class GroupService {
                 .user(currentUser)
                 .role(GroupRole.MEMBER)
                 .canUpload(false)
+                .canChat(true)
                 .joinedAt(LocalDateTime.now())
                 .build();
         groupMemberRepo.save(member);
@@ -251,6 +266,29 @@ public class GroupService {
         );
 
         return buildGroupMemberResponse(savedMember);
+    }
+
+    @Transactional
+    public GroupMemberResponse updateChatPermission(
+            String groupId,
+            String memberId,
+            UpdateChatPermissionRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeaderForPermission(groupId, currentUser);
+
+        if (request == null || request.getCanChat() == null) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+
+        GroupMember member = getMemberInGroup(groupId, memberId);
+        if (member.getRole() == GroupRole.LEADER) {
+            throw new AppException(ErrorCode.GROUP_LEADER_CANNOT_BE_MUTED);
+        }
+
+        member.setCanChat(request.getCanChat());
+        return buildGroupMemberResponse(groupMemberRepo.save(member));
     }
 
     @Transactional
@@ -464,6 +502,32 @@ public class GroupService {
         return member;
     }
 
+    private GroupMember requireLeaderForPermission(String groupId, User currentUser) {
+        String normalizedGroupId = normalizeRequiredText(groupId);
+        GroupMember member = groupMemberRepo.findByGroupIdAndUserId(normalizedGroupId, currentUser.getId())
+                .orElse(null);
+
+        if (member == null) {
+            StudyGroup group = getGroupById(normalizedGroupId);
+            if (group.getOwner().getId().equals(currentUser.getId())) {
+                return createOwnerLeaderMembership(group, currentUser);
+            }
+
+            throw new AppException(ErrorCode.GROUP_LEADER_PERMISSION_REQUIRED);
+        }
+
+        if (member.getGroup().getOwner().getId().equals(currentUser.getId())
+                && member.getRole() != GroupRole.LEADER) {
+            return syncOwnerLeaderMembership(member);
+        }
+
+        if (member.getRole() != GroupRole.LEADER) {
+            throw new AppException(ErrorCode.GROUP_LEADER_PERMISSION_REQUIRED);
+        }
+
+        return member;
+    }
+
     private GroupMember requireApprovedMember(String groupId, User currentUser) {
         String normalizedGroupId = normalizeRequiredText(groupId);
         GroupMember member = groupMemberRepo.findByGroupIdAndUserId(normalizedGroupId, currentUser.getId())
@@ -492,6 +556,7 @@ public class GroupService {
                 .user(owner)
                 .role(GroupRole.LEADER)
                 .canUpload(true)
+                .canChat(true)
                 .joinedAt(LocalDateTime.now())
                 .build();
 
@@ -501,6 +566,7 @@ public class GroupService {
     private GroupMember syncOwnerLeaderMembership(GroupMember member) {
         member.setRole(GroupRole.LEADER);
         member.setCanUpload(true);
+        member.setCanChat(true);
         if (member.getJoinedAt() == null) {
             member.setJoinedAt(LocalDateTime.now());
         }
@@ -559,6 +625,7 @@ public class GroupService {
                 .memberId(member == null ? null : member.getId())
                 .role(role)
                 .canUpload(isLeader || (member != null && Boolean.TRUE.equals(member.getCanUpload())))
+                .canChat(isLeader || member == null || Boolean.TRUE.equals(member.getCanChat()))
                 .inviteEnabled(group.getInviteEnabled())
                 .inviteLink(isLeader ? buildInviteLink(group.getInviteToken()) : null)
                 .memberCount(groupMemberRepo.countByGroupId(group.getId()))
@@ -589,30 +656,9 @@ public class GroupService {
                 .avatarUrl(user.getAvatarUrl())
                 .role(member.getRole().name())
                 .canUpload(Boolean.TRUE.equals(member.getCanUpload()))
+                .canChat(Boolean.TRUE.equals(member.getCanChat()))
                 .joinedAt(member.getJoinedAt() == null ? null : member.getJoinedAt().toString())
                 .build();
-    }
-
-    private List<GroupSummaryResponse> filterGroupsByKeyword(
-            List<GroupSummaryResponse> groups,
-            String keyword
-    ) {
-        String normalizedKeyword = normalizeOptionalText(keyword);
-        if (normalizedKeyword == null) {
-            return groups;
-        }
-
-        String lowerKeyword = normalizedKeyword.toLowerCase();
-
-        return groups.stream()
-                .filter(group -> containsIgnoreCase(group.getName(), lowerKeyword)
-                        || containsIgnoreCase(group.getDescription(), lowerKeyword)
-                        || containsIgnoreCase(group.getOwnerName(), lowerKeyword))
-                .toList();
-    }
-
-    private boolean containsIgnoreCase(String value, String lowerKeyword) {
-        return value != null && value.toLowerCase().contains(lowerKeyword);
     }
 
     private String normalizeRequiredText(String value) {
@@ -631,6 +677,18 @@ public class GroupService {
         }
 
         return normalizedValue;
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private int normalizePageSize(int size) {
+        if (size < 1) {
+            return 5;
+        }
+
+        return Math.min(size, 50);
     }
 
     private String normalizeOptionalText(String value) {

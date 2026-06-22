@@ -2,12 +2,14 @@ package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.CreateGroupRequest;
 import com.pctb.webapp.dto.request.JoinGroupRequest;
+import com.pctb.webapp.dto.request.UpdateChatPermissionRequest;
 import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
+import com.pctb.webapp.dto.response.GroupPageResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.service.GroupService;
@@ -25,8 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/groups")
@@ -57,13 +57,15 @@ public class GroupController {
      */
     @Operation(summary = "Get my groups")
     @GetMapping("/my")
-    public ApiResponse<List<GroupSummaryResponse>> getMyGroups(
+    public ApiResponse<GroupPageResponse> getMyGroups(
             @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "5") int size,
             JwtAuthenticationToken authentication
     ) {
-        return ApiResponse.<List<GroupSummaryResponse>>builder()
+        return ApiResponse.<GroupPageResponse>builder()
                 .message("Get my groups successfully")
-                .result(groupService.getMyGroups(keyword, authentication))
+                .result(groupService.getMyGroups(keyword, page, size, authentication))
                 .build();
     }
 
@@ -129,6 +131,23 @@ public class GroupController {
         return ApiResponse.<GroupMemberResponse>builder()
                 .message("Update upload permission successfully")
                 .result(groupService.updateUploadPermission(groupId, memberId, request, authentication))
+                .build();
+    }
+
+    /**
+     * Leader bat hoac tat quyen chat cua member.
+     */
+    @Operation(summary = "Update group member chat permission")
+    @PutMapping("/{groupId}/members/{memberId}/chat-permission")
+    public ApiResponse<GroupMemberResponse> updateChatPermission(
+            @PathVariable String groupId,
+            @PathVariable String memberId,
+            @RequestBody @Valid UpdateChatPermissionRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<GroupMemberResponse>builder()
+                .message("Update chat permission successfully")
+                .result(groupService.updateChatPermission(groupId, memberId, request, authentication))
                 .build();
     }
 

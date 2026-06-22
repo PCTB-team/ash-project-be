@@ -1,4 +1,4 @@
-package com.pctb.webapp.dto.response;
+package com.pctb.webapp.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -14,24 +14,6 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class GroupMemberResponse {
-    String memberId;
-
-    String userId;
-
-    String username;
-
-    String fullname;
-
-    String email;
-
-    String avatarUrl;
-
-    String role;
-
-    Boolean canUpload;
-
+public class UpdateChatPermissionRequest {
     Boolean canChat;
-
-    String joinedAt;
 }

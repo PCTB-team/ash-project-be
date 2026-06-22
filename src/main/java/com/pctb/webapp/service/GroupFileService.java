@@ -1,6 +1,11 @@
 package com.pctb.webapp.service;
 
+import com.pctb.webapp.dto.request.SaveGroupFileToDashboardRequest;
+import com.pctb.webapp.dto.response.DeleteGroupFileResponse;
+import com.pctb.webapp.dto.response.DocumentResponse;
 import com.pctb.webapp.dto.response.GroupFileResponse;
+import com.pctb.webapp.entity.Document;
+import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.entity.GroupFile;
 import com.pctb.webapp.entity.GroupMember;
 import com.pctb.webapp.entity.GroupRole;
@@ -9,14 +14,20 @@ import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.exception.UploadStatus;
+import com.pctb.webapp.repository.DocumentRepo;
+import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.GroupFileRepo;
 import com.pctb.webapp.repository.GroupMemberRepo;
 import com.pctb.webapp.repository.StudyGroupRepo;
 import com.pctb.webapp.repository.UserRepo;
+import com.pctb.webapp.util.DateTimeUtils;
 import com.pctb.webapp.util.DocumentPreviewUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,11 +51,19 @@ public class GroupFileService {
 
     UserRepo userRepo;
 
+    DocumentRepo documentRepo;
+
+    FolderRepo folderRepo;
+
     FileValidationService fileValidationService;
 
     StorageService storageService;
 
     NotificationService notificationService;
+
+    @Value("${app.upload.max-user-storage}")
+    @NonFinal
+    long maxUserStorage;
 
     /**
      * Upload file into a group.
@@ -151,6 +170,72 @@ public class GroupFileService {
     }
 
     /**
+     * Save a group file into current user's dashboard.
+     */
+    @Transactional
+    public DocumentResponse saveFileToDashboard(
+            String groupId,
+            String fileId,
+            SaveGroupFileToDashboardRequest request,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = userRepo.findByIdForUpdate(authentication.getName())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        requireApprovedMember(groupId, currentUser);
+
+        GroupFile groupFile = getFileInGroup(groupId, fileId);
+        if (Boolean.TRUE.equals(groupFile.getDeleted())) {
+            throw new AppException(ErrorCode.GROUP_FILE_ALREADY_DELETED);
+        }
+
+        String folderId = normalizeOptionalId(request == null ? null : request.getFolderId());
+        Folder folder = resolveFolder(folderId, currentUser.getId());
+        boolean shouldReplace = request != null && Boolean.TRUE.equals(request.getReplaceExisting());
+        Document existingDocument = documentRepo
+                .findByOwnerIdAndFolderIdAndFileName(currentUser.getId(), folderId, groupFile.getFileName())
+                .orElse(null);
+
+        if (existingDocument != null && !shouldReplace) {
+            throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
+        }
+
+        validateStorageCapacity(currentUser, existingDocument, safeFileSize(groupFile));
+
+        if (existingDocument != null) {
+            storageService.delete(existingDocument.getStorageUrl());
+            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
+                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
+            }
+            documentRepo.delete(existingDocument);
+        }
+
+        String extension = normalizeFileExtension(groupFile);
+        String storageFileName = buildDocumentStoredFileName(currentUser.getId(), extension);
+        String storageUrl = storageService.copy(groupFile.getStorageUrl(), storageFileName);
+        LocalDateTime now = DateTimeUtils.nowUtc();
+
+        Document document = Document.builder()
+                .title(groupFile.getFileName())
+                .fileName(groupFile.getFileName())
+                .fileExtension(extension)
+                .mimeType(groupFile.getMimeType())
+                .fileSize(safeFileSize(groupFile))
+                .storageUrl(storageUrl)
+                .status(UploadStatus.COMPLETED)
+                .owner(currentUser)
+                .folder(folder)
+                .createdAt(now)
+                .updatedAt(now)
+                .deleted(false)
+                .build();
+
+        Document savedDocument = documentRepo.save(document);
+        updateFolderSizeCascade(folder, safeFileSize(savedDocument));
+
+        return buildDocumentResponse(savedDocument);
+    }
+
+    /**
      * Move a group file to trash.
      */
     @Transactional
@@ -184,6 +269,35 @@ public class GroupFileService {
                 groupFile.getFileName(),
                 Set.of(currentUser.getId())
         );
+    }
+
+    /**
+     * Permanently delete a group file from trash.
+     */
+    @Transactional
+    public DeleteGroupFileResponse deleteFilePermanently(
+            String groupId,
+            String fileId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        requireLeader(groupId, currentUser);
+
+        GroupFile groupFile = getFileInGroup(groupId, fileId);
+        if (!Boolean.TRUE.equals(groupFile.getDeleted())) {
+            throw new AppException(ErrorCode.GROUP_FILE_NOT_DELETED);
+        }
+
+        String deletedFileId = groupFile.getId();
+        String deletedFileName = groupFile.getFileName();
+        storageService.delete(groupFile.getStorageUrl());
+        groupFileRepo.delete(groupFile);
+
+        return DeleteGroupFileResponse.builder()
+                .fileId(deletedFileId)
+                .fileName(deletedFileName)
+                .deletedPermanently(true)
+                .build();
     }
 
     /**
@@ -280,6 +394,48 @@ public class GroupFileService {
         return groupFile;
     }
 
+    private Folder resolveFolder(String folderId, String userId) {
+        if (folderId == null) {
+            return null;
+        }
+
+        return folderRepo.findActiveByIdAndOwnerId(folderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
+    }
+
+    private void validateStorageCapacity(User owner, Document existingDocument, long newFileSize) {
+        Long usedStorageResult = documentRepo.sumFileSizeByOwner(owner);
+        long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
+        long replacedFileSize = existingDocument == null || existingDocument.getFileSize() == null
+                ? 0
+                : existingDocument.getFileSize();
+        long projectedStorage = usedStorage - replacedFileSize + newFileSize;
+
+        if (projectedStorage > maxUserStorage) {
+            throw new AppException(ErrorCode.STORAGE_NOT_ENOUGH);
+        }
+    }
+
+    private void updateFolderSizeCascade(Folder folder, long delta) {
+        Folder current = folder;
+
+        while (current != null) {
+            long currentSize = current.getSize() == null ? 0 : current.getSize();
+            current.setSize(Math.max(0, currentSize + delta));
+            current.setUpdatedAt(DateTimeUtils.nowUtc());
+            folderRepo.save(current);
+            current = current.getParent();
+        }
+    }
+
+    private long safeFileSize(Document document) {
+        return document.getFileSize() == null ? 0 : document.getFileSize();
+    }
+
+    private long safeFileSize(GroupFile groupFile) {
+        return groupFile.getFileSize() == null ? 0 : groupFile.getFileSize();
+    }
+
     private GroupMember createOwnerLeaderMembership(StudyGroup group, User owner) {
         GroupMember member = GroupMember.builder()
                 .group(group)
@@ -321,6 +477,10 @@ public class GroupFileService {
         return "groups/" + groupId + "/files/" + UUID.randomUUID() + "." + extension;
     }
 
+    private String buildDocumentStoredFileName(String userId, String extension) {
+        return "documents/" + userId + "/" + UUID.randomUUID() + "." + extension;
+    }
+
     private GroupFileResponse buildGroupFileResponse(GroupFile groupFile) {
         String fileExtension = extractFileExtension(groupFile.getFileName());
         return GroupFileResponse.builder()
@@ -339,6 +499,43 @@ public class GroupFileService {
                 .build();
     }
 
+    private DocumentResponse buildDocumentResponse(Document document) {
+        User owner = document.getOwner();
+
+        return DocumentResponse.builder()
+                .documentId(document.getId())
+                .title(document.getTitle())
+                .fileName(document.getFileName())
+                .fileExtension(document.getFileExtension())
+                .mimeType(document.getMimeType())
+                .fileSize(document.getFileSize())
+                .storageUrl(document.getStorageUrl())
+                .folderId(document.getFolder() == null ? null : document.getFolder().getId())
+                .viewUrl("/documents/" + document.getId() + "/view")
+                .downloadUrl("/documents/" + document.getId() + "/download")
+                .status(document.getStatus().name())
+                .ownerId(owner.getId())
+                .ownerFullname(owner.getFullname())
+                .uploadedAt(DateTimeUtils.toDisplayDateTime(document.getCreatedAt()))
+                .timeSinceUpload(DateTimeUtils.formatTimeSince(document.getCreatedAt()))
+                .deleted(Boolean.TRUE.equals(document.getDeleted()))
+                .deletedAt(DateTimeUtils.toDisplayDateTime(document.getDeletedAt()))
+                .build();
+    }
+
+    private String normalizeFileExtension(GroupFile groupFile) {
+        if (groupFile.getFileExtension() != null && !groupFile.getFileExtension().isBlank()) {
+            return groupFile.getFileExtension();
+        }
+
+        String extension = extractFileExtension(groupFile.getFileName());
+        if (extension.isBlank()) {
+            throw new AppException(ErrorCode.DOCUMENT_FILE_NAME_REQUIRED);
+        }
+
+        return extension;
+    }
+
     private String extractFileExtension(String fileName) {
         if (fileName == null) {
             return "";
@@ -355,6 +552,14 @@ public class GroupFileService {
     private String normalizeRequiredText(String value) {
         if (value == null || value.isBlank()) {
             throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        }
+
+        return value.trim();
+    }
+
+    private String normalizeOptionalId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
 
         return value.trim();
