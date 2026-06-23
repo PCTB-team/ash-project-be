@@ -1,140 +1,162 @@
 package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.LockUserRequest;
-import com.pctb.webapp.dto.response.DashboardStatsResponse;
+import com.pctb.webapp.dto.response.AdminTransactionResponse;
+import com.pctb.webapp.dto.response.LoginLogResponse;
 import com.pctb.webapp.dto.response.UserResponse;
-import com.pctb.webapp.entity.SystemLog;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
-import com.pctb.webapp.repository.SystemLogRepo;
+import com.pctb.webapp.mapper.UserMapper;
+import com.pctb.webapp.repository.TransactionRepo;
 import com.pctb.webapp.repository.UserRepo;
+import com.pctb.webapp.repository.UserLoginHistoryRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AdminService {
+
     UserRepo userRepo;
-    SystemLogRepo systemLogRepo;
+    TransactionRepo transactionRepo;
+    UserLoginHistoryRepo userLoginHistoryRepo;
+    UserMapper userMapper;
 
-    // Lấy danh sách user có phân trang; nếu có keyword thì tìm theo username, email hoặc fullname.
-    public Page<UserResponse> getAllAndSearchUsers(String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<User> usersPage = (keyword == null || keyword.trim().isEmpty())
-                ? userRepo.findAll(pageable)
-                : userRepo.searchUsers(keyword.trim(), pageable);
+    // 🔍 1. TÌM KIẾM USER TRÊN TABLE (Đã sắp xếp tài khoản mới lên đầu)
+    public List<UserResponse> searchUsers(String keyword) {
+        if (keyword == null || keyword.isBlank()
+                || "null".equalsIgnoreCase(keyword.trim())
+                || "undefined".equalsIgnoreCase(keyword.trim())) {
+            return userRepo.findAll().stream()
+                    .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .map(userMapper::toUserResponse)
+                    .collect(Collectors.toList());
+        }
 
-        return usersPage.map(this::mapToUserResponse);
+        String cleanKeyword = keyword.trim().toLowerCase();
+        return userRepo.findAll().stream()
+                .filter(user -> (user.getUsername() != null && user.getUsername().toLowerCase().contains(cleanKeyword))
+                        || (user.getFullname() != null && user.getFullname().toLowerCase().contains(cleanKeyword))
+                        || (user.getEmail() != null && user.getEmail().toLowerCase().contains(cleanKeyword)))
+                .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
     }
 
-    // Khóa tài khoản user, lưu lý do khóa và ghi log hệ thống để admin có lịch sử thao tác.
+    // 📜 2. CHECK LOG GIAO DỊCH DÒNG TIỀN (Sắp xếp hóa đơn mới nhất lên đầu bảng)
+    public List<AdminTransactionResponse> getTransactionLogs(String status) {
+        return transactionRepo.findAll().stream()
+                .filter(tx -> status == null || status.isBlank() || tx.getStatus().name().equalsIgnoreCase(status.trim()))
+                .sorted(Comparator.comparing(com.pctb.webapp.entity.Transaction::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(tx -> AdminTransactionResponse.builder()
+                        .transactionId(tx.getId())
+                        .orderCode(tx.getOrderCode())
+                        .username(tx.getUser().getUsername())
+                        .email(tx.getUser().getEmail())
+                        .planName(tx.getPlan().getPlanName())
+                        .amount(tx.getAmount())
+                        .status(tx.getStatus().name())
+                        .createdAt(tx.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // 🔒 3. NÚT HÀNH ĐỘNG: Khóa tài khoản người dùng vi phạm
     @Transactional
-    // Thực hiện khóa user trong một transaction để trạng thái khóa và system log được lưu nhất quán.
     public void lockUser(String userId, LockUserRequest request, String adminUsername) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
-        if (user.getUsername().equals(adminUsername)) {
-            throw new AppException(ErrorCode.ADMIN_CANNOT_LOCK_SELF);
-        }
 
         user.setAccountNonLocked(false);
         user.setLockedAt(LocalDateTime.now());
         user.setLockedReason(request.getReason());
         user.setLockedByAdmin(adminUsername);
-        userRepo.save(user);
 
-        SystemLog log = SystemLog.builder()
-                .actor(adminUsername)
-                .action("LOCK_USER")
-                .details("Đã khóa tài khoản '" + user.getUsername() + "' | Lý do: " + request.getReason())
-                .createdAt(LocalDateTime.now())
-                .build();
-        systemLogRepo.save(log);
+        userRepo.save(user);
     }
 
-    // Mở khóa tài khoản user, xóa thông tin khóa cũ và ghi log thao tác mở khóa.
+    // 🔓 4. NÚT HÀNH ĐỘNG: Mở khóa tài khoản người dùng
     @Transactional
-    // Thực hiện mở khóa user trong một transaction để cập nhật user và ghi log cùng thành công.
-    public void unlockUser(String userId, String adminUsername) {
+    public void unlockUser(String userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
-        if (user.isAccountNonLocked()) {
-            throw new AppException(ErrorCode.ACCOUNT_ALREADY_UNLOCKED);
-        }
 
         user.setAccountNonLocked(true);
         user.setLockedAt(null);
         user.setLockedReason(null);
         user.setLockedByAdmin(null);
+
         userRepo.save(user);
-
-        SystemLog log = SystemLog.builder()
-                .actor(adminUsername)
-                .action("UNLOCK_USER")
-                .details("Đã mở khóa tài khoản '" + user.getUsername() + "'")
-                .createdAt(LocalDateTime.now())
-                .build();
-        systemLogRepo.save(log);
     }
 
-    // Lấy nhật ký hệ thống theo phân trang, sắp xếp theo thứ tự mới nhất ở repository.
-    public Page<SystemLog> getSystemLogs(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        return systemLogRepo.findAllByOrderByCreatedAtDesc(pageable);
+    // ❌ 5. NÚT HÀNH ĐỘNG: Hạ cấp / Hủy VIP thủ công (Đưa về 500MB)
+    @Transactional
+    public void cancelUserVipPlan(String userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setStorageQuota(524288000L);
+        user.setStorageExpiredAt(null);
+
+        userRepo.save(user);
     }
 
-    // Trả về thống kê hệ thống đơn giản gồm tổng số user và thời điểm tạo thống kê.
-    public Map<String, Object> getSystemStats() {
-        long totalUsers = userRepo.count();
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalUsers", totalUsers);
-        stats.put("timestamp", LocalDateTime.now());
-        return stats;
+    // 🔐 6. HÀM LOG BẢO MẬT CHUẨN: Lọc loại log kết hợp tìm kiếm ký tự liên quan
+    public List<UserResponse> getAccountAuditLogs(String type, String keyword) {
+        List<User> allUsers = userRepo.findAll();
+        java.util.stream.Stream<User> userStream = allUsers.stream();
+
+        if ("LOCKED".equalsIgnoreCase(type)) {
+            userStream = userStream.filter(user -> !user.isAccountNonLocked());
+        } else if ("NEW".equalsIgnoreCase(type)) {
+            LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            userStream = userStream.filter(user -> user.getCreatedAt() != null && user.getCreatedAt().isAfter(sevenDaysAgo));
+        }
+
+        if (keyword != null && !keyword.isBlank()) {
+            String cleanKeyword = keyword.trim().toLowerCase();
+            userStream = userStream.filter(user ->
+                    (user.getUsername() != null && user.getUsername().toLowerCase().contains(cleanKeyword))
+                            || (user.getFullname() != null && user.getFullname().toLowerCase().contains(cleanKeyword))
+                            || (user.getEmail() != null && user.getEmail().toLowerCase().contains(cleanKeyword))
+            );
+        }
+
+        return userStream
+                .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(userMapper::toUserResponse)
+                .collect(Collectors.toList());
     }
 
-    // Chuyển entity User sang DTO trả về cho màn hình quản trị, chỉ lấy các field cần hiển thị.
-    private UserResponse mapToUserResponse(User user) {
-        UserResponse response = new UserResponse();
-        response.setId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setFullname(user.getFullname());
-        response.setEmail(user.getEmail());
-        response.setRoles(user.getRoles());
+    // 🌐 7. ĐÃ ĐỒNG BỘ: Không còn lỗi ép kiểu, bảo mật dữ liệu tuyệt đối (Sắp xếp mới nhất lên đầu)
+    public List<LoginLogResponse> getLoginLogs() {
+        return userLoginHistoryRepo.findAll().stream()
+                .sorted((log1, log2) -> {
+                    if (log1.getLoginDate() == null) return 1;
+                    if (log2.getLoginDate() == null) return -1;
+                    return log2.getLoginDate().compareTo(log1.getLoginDate()); // Đảo log mới nhất lên đầu bảng
+                })
+                .map(log -> {
+                    String uName = (log.getUser() != null) ? log.getUser().getUsername() : "N/A";
+                    String uEmail = (log.getUser() != null) ? log.getUser().getEmail() : "N/A";
 
-        response.setAccountNonLocked(user.isAccountNonLocked());
-        response.setLockedAt(user.getLockedAt());
-        response.setLockedReason(user.getLockedReason());
-        response.setLockedByAdmin(user.getLockedByAdmin());
-
-        return response;
-    }
-
-    // Tạo dữ liệu dashboard gồm tổng user và số user mới trong 7 ngày, 2 tuần, 1 tháng gần nhất.
-    public DashboardStatsResponse getDashboardStats() {
-        LocalDateTime now = LocalDateTime.now();
-
-        Map<String, Long> growth = new HashMap<>();
-        growth.put("last7Days", userRepo.countByCreatedAtAfter(now.minusDays(7)));
-        growth.put("last2Weeks", userRepo.countByCreatedAtAfter(now.minusDays(14)));
-        growth.put("last1Month", userRepo.countByCreatedAtAfter(now.minusMonths(1)));
-
-        return DashboardStatsResponse.builder()
-                .totalUsers(userRepo.count())
-                .userGrowth(growth)
-                .build();
+                    return LoginLogResponse.builder()
+                            .id(log.getId())
+                            .username(uName)
+                            .email(uEmail)
+                            .loginDate(log.getLoginDate()) // 🟢 Khớp chuẩn kiểu dữ liệu LocalDate
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 }
