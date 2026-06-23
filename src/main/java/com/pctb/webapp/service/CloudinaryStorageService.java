@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -358,5 +359,17 @@ public class CloudinaryStorageService implements StorageService {
             return "video";
         }
         return "image";
+    }
+
+    // =========================================================================
+// 🟢 ĐÃ SỬA: ÉP ĐƯỜNG DẪN TUYỆT ĐỐI ĐẾN ENTITY USER CỦA DỰ ÁN
+// =========================================================================
+    public void checkStorageBeforeUpload(com.pctb.webapp.entity.User user, long newFileSize) {
+        long maxStorage = user.getStorageQuota() != null ? user.getStorageQuota() : 524288000L;
+        long currentUsed = user.getStorageUsed() != null ? user.getStorageUsed() : 0L;
+
+        if (currentUsed + newFileSize > maxStorage) {
+            throw new AppException(ErrorCode.STORAGE_NOT_ENOUGH); // Mã lỗi 1509
+        }
     }
 }
