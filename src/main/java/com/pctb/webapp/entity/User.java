@@ -81,4 +81,23 @@ public class User {
 
     @Column(name = "storage_expired_at")
     LocalDateTime storageExpiredAt; // null tương ứng với dùng gói 500MB mặc định vĩnh viễn
+
+    // =========================================================================
+    // 🟢 HÀM GETTER/SETTER THỦ CÔNG - KHẮC PHỤC LỖI KHÔNG NHẬN DIỆN CỦA LOMBOK
+    // =========================================================================
+    public Long getStorageQuota() {
+        return this.storageQuota;
+    }
+
+    public void setStorageQuota(Long storageQuota) {
+        this.storageQuota = storageQuota;
+    }
+
+    public Long getStorageUsed() {
+        return this.storageUsed;
+    }
+
+    public void setStorageUsed(Long storageUsed) {
+        this.storageUsed = storageUsed;
+    }
 }

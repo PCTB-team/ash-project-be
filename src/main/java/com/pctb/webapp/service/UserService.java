@@ -56,14 +56,20 @@ public class UserService {
 
         Long usedStorageResult = documentRepo.sumFileSizeByOwner(user);
         long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
-        long remainingStorage = Math.max(0, maxUserStorage - usedStorage);
-        double usagePercent = maxUserStorage <= 0
+
+        // CHỖ SỬA CHÍ MẠNG: Thay vì ép cứng lấy maxUserStorage từ file cấu hình,
+        // hệ thống sẽ bốc trường storageQuota trực tiếp từ User dưới Database lên để kiểm tra.
+        long maxStorage = user.getStorageQuota() != null ? user.getStorageQuota() : maxUserStorage;
+
+        long remainingStorage = Math.max(0, maxStorage - usedStorage);
+
+        double usagePercent = maxStorage <= 0
                 ? 0
-                : Math.round(usedStorage * 10000.0 / maxUserStorage) / 100.0;
+                : Math.round(usedStorage * 10000.0 / maxStorage) / 100.0;
 
         return UserStorageResponse.builder()
                 .usedStorage(usedStorage)
-                .maxStorage(maxUserStorage)
+                .maxStorage(maxStorage) // Trả về hạn mức dung lượng gói cước thực tế của User
                 .remainingStorage(remainingStorage)
                 .usagePercent(usagePercent)
                 .build();
