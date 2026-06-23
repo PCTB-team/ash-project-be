@@ -49,6 +49,10 @@ public class DocumentService {
 
     FileValidationService fileValidationService;
 
+    QdrantService qdrantService;
+
+    DocumentIndexingService documentIndexingService;
+
     // Lấy toàn bộ tài liệu active của user hiện tại, sắp xếp theo thời gian tạo mới nhất.
     public List<DocumentResponse> getMyDocuments(JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
@@ -232,6 +236,7 @@ public class DocumentService {
             document.setUpdatedAt(DateTimeUtils.nowUtc());
             updateFolderSizeCascade(document.getFolder(), -safeFileSize(document));
             documentRepo.save(document);
+            qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
         }
 
         return DeleteDocumentResponse.builder()
@@ -280,6 +285,7 @@ public class DocumentService {
         updateFolderSizeCascade(document.getFolder(), safeFileSize(document));
 
         document = documentRepo.save(document);
+        documentIndexingService.indexDocument(document.getId());
 
         return buildDocumentResponse(document);
     }
@@ -307,6 +313,7 @@ public class DocumentService {
             throw new AppException(ErrorCode.DOCUMENT_NOT_IN_TRASH);
         }
 
+        qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
         storageService.delete(document.getStorageUrl());
         documentRepo.delete(document);
 

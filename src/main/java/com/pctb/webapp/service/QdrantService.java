@@ -98,6 +98,31 @@ public class QdrantService {
                 .toBodilessEntity();
     }
 
+    public void deleteDocumentChunks(String ownerId, String documentId) {
+        Map<String, Object> requestBody = Map.of(
+                "filter", Map.of(
+                        "must", List.of(
+                                Map.of(
+                                        "key", "ownerId",
+                                        "match", Map.of("value", ownerId)
+                                ),
+                                Map.of(
+                                        "key", "documentId",
+                                        "match", Map.of("value", documentId)
+                                )
+                        )
+                )
+        );
+
+        RestClient.RequestBodySpec requestSpec = restClient.post()
+                .uri("/collections/{collectionName}/points/delete", collectionName);
+
+        applyApiKeyIfPresent(requestSpec)
+                .body(requestBody)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     private Map<String, Object> buildChunkPayload(
             Document document,
             String chunkContent,

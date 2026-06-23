@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FolderRepo extends JpaRepository<Folder, String> {
+    @Query("select f from Folder f where f.owner.id = :ownerId and (f.deleted = false or f.deleted is null) order by f.createdAt desc")
+    List<Folder> findActiveByOwnerId(@Param("ownerId") String ownerId);
+
     @Query("select f from Folder f where f.id = :folderId and f.owner.id = :ownerId and (f.deleted = false or f.deleted is null)")
     Optional<Folder> findActiveByIdAndOwnerId(@Param("folderId") String folderId, @Param("ownerId") String ownerId);
 

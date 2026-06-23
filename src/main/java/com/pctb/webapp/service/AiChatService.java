@@ -5,16 +5,21 @@ import com.pctb.webapp.dto.response.AiAnswerSource;
 import com.pctb.webapp.dto.response.AiChatSourceResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
 import com.pctb.webapp.entity.Document;
+import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,6 +36,11 @@ import java.util.stream.Collectors;
 @Service
 public class AiChatService {
     private static final String SYSTEM_INSTRUCTION = "Ban la tro ly AI trong he thong quan ly tai lieu. Tra loi ngan gon, ro rang, bang tieng Viet.";
+    private static final String KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE = "Toi khong tim thay thong tin lien quan trong cac tai lieu hien co.";
+    private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
+    private static final int GEMINI_MAX_RETRIES = 3;
+    private static final String AI_BUSY_MESSAGE = "AI hien dang qua tai, vui long thu lai sau.";
+    private static final String AI_UNAVAILABLE_MESSAGE = "AI service tam thoi khong kha dung.";
 
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
@@ -42,10 +52,10 @@ public class AiChatService {
     @Value("${gemini.api-key}")
     private String apiKey;
 
-    @Value("${gemini.model:gemini-3.5-flash}")
+    @Value("${gemini.model}")
     private String model;
 
-    @Value("${gemini.max-output-tokens:4096}")
+    @Value("${gemini.max-output-tokens:1024}")
     private int maxOutputTokens;
 
     public AiChatService(
@@ -82,9 +92,10 @@ public class AiChatService {
         // Lấy user hiện tại để khóa quyền truy cập và retrieval theo owner.
         String userId = authentication.getName();
         Document inferredDocument = resolveDocumentFromMessage(request.getMessage(), userId);
+        Folder inferredFolder = resolveFolderFromMessage(request.getMessage(), userId);
 
         // Xác định phạm vi chat: một tài liệu, một folder hoặc toàn bộ tài liệu.
-        AiKnowledgeScope scope = resolveKnowledgeScope(request, inferredDocument);
+        AiKnowledgeScope scope = resolveKnowledgeScope(request, inferredDocument, inferredFolder);
 
         // Kiểm tra quyền truy cập theo scope trước khi search dữ liệu.
         switch (scope) {
@@ -93,13 +104,16 @@ public class AiChatService {
                     validateDocumentScopeAccess(request.getDocumentId(), userId);
                 }
             }
-            case FOLDER -> validateFolderScopeAccess(request.getFolderId(), userId);
+            case FOLDER -> validateFolderScopeAccess(
+                    hasText(request.getFolderId()) ? request.getFolderId() : inferredFolder.getId(),
+                    userId
+            );
             case ALL_DOCUMENTS -> {
             }
         }
 
         // Chuẩn hóa điều kiện search thành một object filter nội bộ.
-        AiKnowledgeFilter filter = buildKnowledgeFilter(request, userId, scope, inferredDocument);
+        AiKnowledgeFilter filter = buildKnowledgeFilter(request, userId, scope, inferredDocument, inferredFolder);
 
         // Retrieve cac chunk lien quan tu lop vector search.
         List<AiRetrievedChunk> retrievedChunks = retrieveKnowledgeChunks(
@@ -116,8 +130,8 @@ public class AiChatService {
         }
 
         return AiDocumentChatResponse.builder()
-                .answer(generateGeneralAnswer(request.getMessage()))
-                .answerSource(AiAnswerSource.GENERAL)
+                .answer(KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE)
+                .answerSource(AiAnswerSource.DOCUMENT)
                 .sources(List.of())
                 .build();
     }
@@ -125,7 +139,8 @@ public class AiChatService {
     // Suy ra scope chat từ request đầu vào.
     private AiKnowledgeScope resolveKnowledgeScope(
             AiKnowledgeChatRequest request,
-            Document inferredDocument
+            Document inferredDocument,
+            Folder inferredFolder
     ) {
         if (hasText(request.getDocumentId())) {
             return AiKnowledgeScope.DOCUMENT;
@@ -139,6 +154,10 @@ public class AiChatService {
             return AiKnowledgeScope.DOCUMENT;
         }
 
+        if (inferredFolder != null) {
+            return AiKnowledgeScope.FOLDER;
+        }
+
         return AiKnowledgeScope.ALL_DOCUMENTS;
     }
 
@@ -147,7 +166,8 @@ public class AiChatService {
             AiKnowledgeChatRequest request,
             String userId,
             AiKnowledgeScope scope,
-            Document inferredDocument
+            Document inferredDocument,
+            Folder inferredFolder
     ) {
         return switch (scope) {
             case DOCUMENT -> AiKnowledgeFilter.builder()
@@ -159,7 +179,9 @@ public class AiChatService {
 
             case FOLDER -> AiKnowledgeFilter.builder()
                     .ownerId(userId)
-                    .folderId(request.getFolderId())
+                    .folderId(hasText(request.getFolderId())
+                            ? request.getFolderId()
+                            : inferredFolder.getId())
                     .build();
 
             case ALL_DOCUMENTS -> AiKnowledgeFilter.builder()
@@ -219,6 +241,7 @@ public class AiChatService {
                 Yeu cau:
                 Chi tra loi dua tren ngu canh tai lieu da cung cap.
                 Neu ngu canh khong du de tra loi day du, hay noi ro phan nao khong co trong tai lieu.
+                Khong duoc tra loi bang kien thuc ben ngoai tai lieu.
                 """.formatted(userMessage, context);
     }
 
@@ -230,10 +253,6 @@ public class AiChatService {
         return generate(prompt);
     }
 
-    private String generateGeneralAnswer(String userMessage) {
-        return generate(userMessage);
-    }
-
     private boolean hasRelevantContext(
             List<AiRetrievedChunk> retrievedChunks,
             AiKnowledgeScope scope
@@ -242,7 +261,7 @@ public class AiChatService {
             return false;
         }
 
-        if (scope == AiKnowledgeScope.DOCUMENT) {
+        if (scope == AiKnowledgeScope.DOCUMENT || scope == AiKnowledgeScope.FOLDER) {
             return true;
         }
 
@@ -268,6 +287,20 @@ public class AiChatService {
                 .orElse(null);
     }
 
+    private Folder resolveFolderFromMessage(String message, String userId) {
+        if (!hasText(message)) {
+            return null;
+        }
+
+        String normalizedMessage = normalizeTextForMatching(message);
+
+        return folderRepo.findActiveByOwnerId(userId).stream()
+                .filter(folder -> matchesFolderName(normalizedMessage, folder.getName()))
+                .max(Comparator.comparingInt(folder ->
+                        folder.getName() == null ? 0 : folder.getName().length()))
+                .orElse(null);
+    }
+
     private boolean matchesDocumentName(String normalizedMessage, String fileName) {
         if (!hasText(fileName)) {
             return false;
@@ -280,6 +313,15 @@ public class AiChatService {
 
         String baseName = removeFileExtension(normalizedFileName);
         return baseName.length() >= 3 && normalizedMessage.contains(baseName);
+    }
+
+    private boolean matchesFolderName(String normalizedMessage, String folderName) {
+        if (!hasText(folderName)) {
+            return false;
+        }
+
+        String normalizedFolderName = normalizeTextForMatching(folderName);
+        return normalizedFolderName.length() >= 3 && normalizedMessage.contains(normalizedFolderName);
     }
 
     private String normalizeTextForMatching(String value) {
@@ -402,25 +444,52 @@ public class AiChatService {
     }
 
     private String executeGeminiRequest(Map<String, Object> requestBody) {
-        String responseBody = restClient.post()
-                .uri("/models/{model}:generateContent", model)
-                .header("x-goog-api-key", apiKey)
-                .header(HttpHeaders.CONTENT_TYPE, "application/json")
-                .body(requestBody)
-                .retrieve()
-                .body(String.class);
+        for (int attempt = 1; attempt <= GEMINI_MAX_RETRIES; attempt++) {
+            try {
+                String responseBody = restClient.post()
+                        .uri("/models/{model}:generateContent", model)
+                        .header("x-goog-api-key", apiKey)
+                        .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                        .body(requestBody)
+                        .retrieve()
+                        .body(String.class);
 
-        if (responseBody == null || responseBody.isBlank()) {
-            return "";
+                if (responseBody == null || responseBody.isBlank()) {
+                    return "";
+                }
+
+                JsonNode response = jsonMapper.readTree(responseBody);
+                return response.path("candidates")
+                        .path(0)
+                        .path("content")
+                        .path("parts")
+                        .path(0)
+                        .path("text")
+                        .asString();
+            } catch (HttpServerErrorException.ServiceUnavailable exception) {
+                log.warn("Gemini returned 503 on attempt {}/{} for model {}", attempt, GEMINI_MAX_RETRIES, model);
+                if (attempt == GEMINI_MAX_RETRIES) {
+                    return AI_BUSY_MESSAGE;
+                }
+                sleepBeforeRetry(attempt);
+            } catch (HttpServerErrorException exception) {
+                log.error("Gemini server error {} for model {}", exception.getStatusCode(), model, exception);
+                return AI_UNAVAILABLE_MESSAGE;
+            } catch (ResourceAccessException exception) {
+                log.error("Gemini request failed due to network or timeout issue for model {}", model, exception);
+                return AI_UNAVAILABLE_MESSAGE;
+            }
         }
 
-        JsonNode response = jsonMapper.readTree(responseBody);
-        return response.path("candidates")
-                .path(0)
-                .path("content")
-                .path("parts")
-                .path(0)
-                .path("text")
-                .asString();
+        return AI_BUSY_MESSAGE;
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(1000L * attempt);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Gemini retry interrupted", exception);
+        }
     }
 }
