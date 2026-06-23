@@ -61,10 +61,13 @@ public class CloudinaryStorageService implements StorageService {
         if (storageUrl == null || storageUrl.isBlank()) {
             return;
         }
-        try {
-            String resourceType = determinateResourceType(storageUrl);
-            String publicId = extractPublicId(storageUrl, resourceType);
+        String resourceType = determinateResourceType(storageUrl);
+        String publicId = extractPublicId(storageUrl, resourceType);
+        if (publicId.isBlank()) {
+            throw new AppException(ErrorCode.UPLOAD_FAILED);
+        }
 
+        try {
             cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", resourceType));
         } catch (IOException exception) {
             throw new AppException(ErrorCode.UPLOAD_FAILED);
@@ -78,6 +81,9 @@ public class CloudinaryStorageService implements StorageService {
         try {
             String resourceType = determinateResourceType(oldStorageUrl);
             String oldPublicId = extractPublicId(oldStorageUrl, resourceType);
+            if (oldPublicId.isBlank()) {
+                throw new AppException(ErrorCode.UPLOAD_FAILED);
+            }
             String newPublicId = buildUploadPublicId(newFileName, resourceType);
 
             Map renameResult = cloudinary.uploader().rename(oldPublicId, newPublicId,
@@ -267,30 +273,45 @@ public class CloudinaryStorageService implements StorageService {
     }
 
     private String extractPublicId(String url, String resourceType) {
-        if (url == null || url.isBlank() || !url.contains("upload/")) {
+        if (url == null || url.isBlank() || !url.contains("/upload/")) {
             return "";
         }
 
-        String[] parts = url.split("upload/");
+        String[] parts = url.split("/upload/", 2);
         if (parts.length < 2) {
             return "";
         }
 
-        String splitPart = parts[1];
+        String path = parts[1];
+        int queryIndex = path.indexOf('?');
+        if (queryIndex >= 0) {
+            path = path.substring(0, queryIndex);
+        }
 
-        if (splitPart.startsWith("v")) {
-            int firstSlash = splitPart.indexOf("/");
-            if (firstSlash != -1) {
-                splitPart = splitPart.substring(firstSlash + 1);
+        String[] segments = path.split("/");
+        if (segments.length == 0) {
+            return "";
+        }
+
+        int startIndex = 0;
+        if (segments[startIndex].matches("v\\d+")) {
+            startIndex++;
+        }
+
+        if (startIndex >= segments.length) {
+            return "";
+        }
+
+        String publicId = String.join("/", java.util.Arrays.copyOfRange(segments, startIndex, segments.length));
+
+        if (!"raw".equals(resourceType)) {
+            int lastDot = publicId.lastIndexOf('.');
+            if (lastDot > 0) {
+                publicId = publicId.substring(0, lastDot);
             }
         }
 
-        int lastDot = splitPart.lastIndexOf('.');
-        if (lastDot != -1 && !"raw".equals(resourceType)) {
-            splitPart = splitPart.substring(0, lastDot);
-        }
-
-        return splitPart;
+        return publicId.trim();
     }
 
     private String determineUploadResourceType(String fileName) {
