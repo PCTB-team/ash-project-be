@@ -3,8 +3,6 @@ package com.pctb.webapp.controller;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CheckoutResponse;
-import com.pctb.webapp.dto.response.UserStorageResponse;
-import com.pctb.webapp.entity.StoragePlan;
 import com.pctb.webapp.entity.Transaction;
 import com.pctb.webapp.entity.TransactionStatus;
 import com.pctb.webapp.exception.AppException;
@@ -20,8 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.webhooks.WebhookData;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/payment")
@@ -101,23 +97,5 @@ public class PaymentController {
     public ApiResponse<TransactionStatus> status(@PathVariable String id) {
         Transaction tx = paymentService.getTransactionStatus(id);
         return ApiResponse.<TransactionStatus>builder().result(tx.getStatus()).build();
-    }
-
-    // =========================================================================
-    // TIỆN ÍCH USER: LẤY DANH SÁCH GÓI VIP ĐƯỢC PHÉP NÂNG CẤP (ẨN CÁC GÓI THẤP HƠN)
-    // =========================================================================
-    @GetMapping("/available-plans")
-    public ApiResponse<List<StoragePlan>> getAvailablePlans(@AuthenticationPrincipal Jwt jwt) {
-        List<StoragePlan> plans = paymentService.getAvailablePlansForUser(jwt.getSubject());
-        return ApiResponse.<List<StoragePlan>>builder().result(plans).build();
-    }
-
-    // =========================================================================
-    // TIỆN ÍCH USER: XEM THÔNG TIN DUNG LƯỢNG THỰC TẾ ĐÃ SỬ DỤNG VÀ THỜI HẠN GÓI
-    // =========================================================================
-    @GetMapping("/my-storage")
-    public ApiResponse<UserStorageResponse> getMyStorageDetails(@AuthenticationPrincipal Jwt jwt) {
-        UserStorageResponse storageDetails = paymentService.getMyStorageDetails(jwt.getSubject());
-        return ApiResponse.<UserStorageResponse>builder().result(storageDetails).build();
     }
 }

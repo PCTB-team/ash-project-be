@@ -5,6 +5,8 @@ import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.UserProfileResponse;
 import com.pctb.webapp.dto.response.UserResponse;
 import com.pctb.webapp.dto.response.UserStorageResponse;
+import com.pctb.webapp.entity.StoragePlan;
+import com.pctb.webapp.service.PaymentService;
 import com.pctb.webapp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,7 +32,7 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE,makeFinal = true)
 public class UserController {
     UserService userService;
-
+    private final PaymentService paymentService;
     // Đưa ra API
     @Operation(summary = "Get all users")
     @GetMapping
@@ -85,6 +87,15 @@ public class UserController {
         return ApiResponse.<UserProfileResponse>builder()
                 .message("Update profile successfully")
                 .result(userService.updateProfile(userId, request))
+                .build();
+    }
+
+    @Operation(summary = "Get all available storage plans for upgrade")
+    @GetMapping("/available-plans")
+    public ApiResponse<List<StoragePlan>> getAvailablePlans() {
+        return ApiResponse.<List<StoragePlan>>builder()
+                .message("Get available plans successfully")
+                .result(paymentService.getAllAvailablePlans()) // Gọi sang hàm service của bạn
                 .build();
     }
 
