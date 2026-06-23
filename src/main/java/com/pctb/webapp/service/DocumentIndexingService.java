@@ -59,22 +59,50 @@ public class DocumentIndexingService {
             return chunks;
         }
 
-        String normalizedText = text.replaceAll("\\s+", " ").trim();
-        int chunkSize = 1000;
-        int overlap = 200;
-        int start = 0;
+        String normalizedText = text.replace("\r", "").trim();
+        String[] paragraphs = normalizedText.split("\\n\\s*\\n+");
+        int maxChunkLength = 1200;
+        int overlapLength = 200;
 
-        while (start < normalizedText.length()) {
-            int end = Math.min(start + chunkSize, normalizedText.length());
-            chunks.add(normalizedText.substring(start, end));
+        StringBuilder currentChunk = new StringBuilder();
 
-            if (end == normalizedText.length()) {
-                break;
+        for (String paragraph : paragraphs) {
+            String cleanedParagraph = paragraph.replaceAll("\\s+", " ").trim();
+            if (cleanedParagraph.isBlank()) {
+                continue;
             }
 
-            start = Math.max(end - overlap, start + 1);
+            if (currentChunk.length() == 0) {
+                appendParagraph(currentChunk, cleanedParagraph);
+                continue;
+            }
+
+            if (currentChunk.length() + 2 + cleanedParagraph.length() <= maxChunkLength) {
+                appendParagraph(currentChunk, cleanedParagraph);
+                continue;
+            }
+
+            chunks.add(currentChunk.toString());
+
+            String overlap = currentChunk.length() <= overlapLength
+                    ? currentChunk.toString()
+                    : currentChunk.substring(currentChunk.length() - overlapLength);
+
+            currentChunk = new StringBuilder(overlap);
+            appendParagraph(currentChunk, cleanedParagraph);
+        }
+
+        if (currentChunk.length() > 0) {
+            chunks.add(currentChunk.toString());
         }
 
         return chunks;
+    }
+
+    private void appendParagraph(StringBuilder chunkBuilder, String paragraph) {
+        if (chunkBuilder.length() > 0) {
+            chunkBuilder.append("\n\n");
+        }
+        chunkBuilder.append(paragraph);
     }
 }

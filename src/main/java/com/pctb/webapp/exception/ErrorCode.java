@@ -271,6 +271,8 @@ public enum ErrorCode {
 
     FOLDER_ACCESS_DENIED(1322, "Không có quyền truy cập thư mục", HttpStatus.FORBIDDEN),
 
+    DOCUMENT_INDEXING_FAILED(1323, "Lap chi muc tai lieu that bai", HttpStatus.INTERNAL_SERVER_ERROR),
+
     // ==================== ADMIN ADVANCED ERRORS (14xx) ====================
 
     // Dùng khi Admin cố tình tự khóa tài khoản của chính mình

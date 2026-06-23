@@ -42,6 +42,8 @@ public class DocumentUploadService {
 
     DocumentIndexingService documentIndexingService;
 
+    QdrantService qdrantService;
+
     @Value("${app.upload.max-user-storage}")
     @NonFinal
     long maxUserStorage;
@@ -76,14 +78,6 @@ public class DocumentUploadService {
 
         validateStorageCapacity(owner, existingDocument, file.getSize());
 
-        if (existingDocument != null) {
-            storageService.delete(existingDocument.getStorageUrl());
-            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
-                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
-            }
-            documentRepo.delete(existingDocument);
-        }
-
         String storageUrl = storageService.upload(file, storedFileName);
         LocalDateTime now = DateTimeUtils.nowUtc();
 
@@ -103,13 +97,26 @@ public class DocumentUploadService {
                 .build();
 
         document = documentRepo.save(document);
-        updateFolderSizeCascade(folder, file.getSize());
 
         try {
             documentIndexingService.indexDocument(document.getId());
         } catch (Exception exception) {
-            exception.printStackTrace();
+            qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
+            storageService.delete(document.getStorageUrl());
+            documentRepo.delete(document);
+            throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
         }
+
+        if (existingDocument != null) {
+            qdrantService.deleteDocumentChunks(owner.getId(), existingDocument.getId());
+            storageService.delete(existingDocument.getStorageUrl());
+            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
+                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
+            }
+            documentRepo.delete(existingDocument);
+        }
+
+        updateFolderSizeCascade(folder, file.getSize());
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())
