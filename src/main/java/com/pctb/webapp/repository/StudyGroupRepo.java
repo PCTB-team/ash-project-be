@@ -19,7 +19,7 @@ public interface StudyGroupRepo extends JpaRepository<StudyGroup, String> {
 
     @Query(
             value = """
-                    SELECT DISTINCT g
+                    SELECT g
                     FROM StudyGroup g
                     LEFT JOIN GroupMember gm ON gm.group = g AND gm.user.id = :userId
                     WHERE (gm.id IS NOT NULL OR g.owner.id = :userId)
@@ -29,10 +29,10 @@ public interface StudyGroupRepo extends JpaRepository<StudyGroup, String> {
                             OR LOWER(g.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
                             OR LOWER(g.owner.fullname) LIKE LOWER(CONCAT('%', :keyword, '%'))
                       )
-                    ORDER BY COALESCE(gm.joinedAt, g.createdAt) DESC
+                    ORDER BY CASE WHEN gm.joinedAt IS NULL THEN g.createdAt ELSE gm.joinedAt END DESC
                     """,
             countQuery = """
-                    SELECT COUNT(DISTINCT g)
+                    SELECT COUNT(g)
                     FROM StudyGroup g
                     LEFT JOIN GroupMember gm ON gm.group = g AND gm.user.id = :userId
                     WHERE (gm.id IS NOT NULL OR g.owner.id = :userId)
