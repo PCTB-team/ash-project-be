@@ -18,7 +18,7 @@ import java.util.Set;
 @Lazy
 public class DocumentTextExtractorService {
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 20000;
-    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("pdf", "docx", "txt", "ppt", "pptx");
+    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("pdf", "docx", "txt", "ppt", "pptx", "xls", "xlsx", "csv", "md");
 
     private final AutoDetectParser parser = new AutoDetectParser();
     private final FileValidationService fileValidationService;
@@ -85,5 +85,10 @@ public class DocumentTextExtractorService {
         }
 
         return extension;
+    }
+
+    public boolean supportsIndexing(String fileName) {
+        String extension = fileValidationService.getExtension(fileName);
+        return SUPPORTED_EXTENSIONS.contains(extension);
     }
 }

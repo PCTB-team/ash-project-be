@@ -42,6 +42,8 @@ public class DocumentUploadService {
 
     DocumentIndexingService documentIndexingService;
 
+    DocumentTextExtractorService documentTextExtractorService;
+
     QdrantService qdrantService;
 
     @Value("${app.upload.max-user-storage}")
@@ -98,13 +100,15 @@ public class DocumentUploadService {
 
         document = documentRepo.save(document);
 
-        try {
-            documentIndexingService.indexDocument(document.getId());
-        } catch (Exception exception) {
-            qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
-            storageService.delete(document.getStorageUrl());
-            documentRepo.delete(document);
-            throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
+        if (documentTextExtractorService.supportsIndexing(originalFileName)) {
+            try {
+                documentIndexingService.indexDocument(document.getId());
+            } catch (Exception exception) {
+                qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
+                storageService.delete(document.getStorageUrl());
+                documentRepo.delete(document);
+                throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
+            }
         }
 
         if (existingDocument != null) {
