@@ -25,12 +25,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -122,8 +126,13 @@ public class AiChatService {
         );
 
         if (hasRelevantContext(retrievedChunks, scope)) {
+            String answer = generateDocumentGroundedAnswer(request.getMessage(), retrievedChunks);
+            if (isAiTemporaryFailure(answer)) {
+                answer = buildFallbackAnswerFromSources(retrievedChunks);
+            }
+
             return AiDocumentChatResponse.builder()
-                    .answer(generateDocumentGroundedAnswer(request.getMessage(), retrievedChunks))
+                    .answer(answer)
                     .answerSource(AiAnswerSource.DOCUMENT)
                     .sources(toChatSources(retrievedChunks))
                     .build();
@@ -195,7 +204,88 @@ public class AiChatService {
             String query,
             AiKnowledgeFilter filter
     ) {
+        if (filter.getFolderId() != null && !filter.getFolderId().isBlank()) {
+            return retrieveKnowledgeChunksForFolderScope(query, filter);
+        }
+
         return qdrantService.searchKnowledgeChunks(query, filter);
+    }
+
+    private List<AiRetrievedChunk> retrieveKnowledgeChunksForFolderScope(
+            String query,
+            AiKnowledgeFilter filter
+    ) {
+        Set<String> folderIds = collectFolderTreeIds(filter.getOwnerId(), filter.getFolderId());
+        if (folderIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Document> documents = documentRepo.findActiveByOwnerId(filter.getOwnerId()).stream()
+                .filter(document -> document.getFolder() != null)
+                .filter(document -> folderIds.contains(document.getFolder().getId()))
+                .toList();
+
+        if (documents.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, AiRetrievedChunk> bestChunkByDocumentAndIndex = new LinkedHashMap<>();
+
+        for (Document document : documents) {
+            AiKnowledgeFilter documentFilter = AiKnowledgeFilter.builder()
+                    .ownerId(filter.getOwnerId())
+                    .documentId(document.getId())
+                    .build();
+
+            for (AiRetrievedChunk chunk : qdrantService.searchKnowledgeChunks(query, documentFilter)) {
+                String chunkKey = chunk.getDocumentId() + ":" + chunk.getChunkIndex();
+                AiRetrievedChunk existingChunk = bestChunkByDocumentAndIndex.get(chunkKey);
+
+                if (existingChunk == null
+                        || (chunk.getScore() != null
+                        && (existingChunk.getScore() == null || chunk.getScore() > existingChunk.getScore()))) {
+                    bestChunkByDocumentAndIndex.put(chunkKey, chunk);
+                }
+            }
+        }
+
+        return bestChunkByDocumentAndIndex.values().stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(
+                        AiRetrievedChunk::getScore,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .limit(5)
+                .toList();
+    }
+
+    private Set<String> collectFolderTreeIds(String ownerId, String rootFolderId) {
+        Folder rootFolder = folderRepo.findActiveByIdAndOwnerId(rootFolderId, ownerId)
+                .orElse(null);
+        if (rootFolder == null) {
+            return Set.of();
+        }
+
+        Map<String, List<Folder>> childFoldersByParentId = folderRepo.findActiveByOwnerId(ownerId).stream()
+                .filter(folder -> folder.getParent() != null)
+                .collect(Collectors.groupingBy(folder -> folder.getParent().getId()));
+
+        Set<String> folderIds = new java.util.LinkedHashSet<>();
+        ArrayDeque<String> pendingFolderIds = new ArrayDeque<>();
+        pendingFolderIds.add(rootFolder.getId());
+
+        while (!pendingFolderIds.isEmpty()) {
+            String currentFolderId = pendingFolderIds.removeFirst();
+            if (!folderIds.add(currentFolderId)) {
+                continue;
+            }
+
+            for (Folder childFolder : childFoldersByParentId.getOrDefault(currentFolderId, List.of())) {
+                pendingFolderIds.addLast(childFolder.getId());
+            }
+        }
+
+        return folderIds;
     }
 
 
@@ -251,6 +341,26 @@ public class AiChatService {
     ) {
         String prompt = buildDocumentGroundedPrompt(userMessage, retrievedChunks);
         return generate(prompt);
+    }
+
+    private boolean isAiTemporaryFailure(String answer) {
+        return AI_BUSY_MESSAGE.equals(answer) || AI_UNAVAILABLE_MESSAGE.equals(answer);
+    }
+
+    private String buildFallbackAnswerFromSources(List<AiRetrievedChunk> retrievedChunks) {
+        String extractedContent = retrievedChunks.stream()
+                .limit(2)
+                .map(AiRetrievedChunk::getExcerpt)
+                .filter(this::hasText)
+                .map(excerpt -> excerpt.length() > 500 ? excerpt.substring(0, 500) + "..." : excerpt)
+                .collect(Collectors.joining("\n\n"));
+
+        if (!hasText(extractedContent)) {
+            return "Da tim thay tai lieu lien quan, nhung AI tam thoi khong kha dung de tong hop cau tra loi.";
+        }
+
+        return "Da tim thay tai lieu lien quan, nhung AI tam thoi khong kha dung. Noi dung trich xuat:\n\n"
+                + extractedContent;
     }
 
     private boolean hasRelevantContext(
@@ -444,39 +554,27 @@ public class AiChatService {
     }
 
     private String executeGeminiRequest(Map<String, Object> requestBody) {
+        return executeGeminiRequestWithRetry(requestBody, model);
+    }
+
+    private String executeGeminiRequestWithRetry(
+            Map<String, Object> requestBody,
+            String targetModel
+    ) {
         for (int attempt = 1; attempt <= GEMINI_MAX_RETRIES; attempt++) {
             try {
-                String responseBody = restClient.post()
-                        .uri("/models/{model}:generateContent", model)
-                        .header("x-goog-api-key", apiKey)
-                        .header(HttpHeaders.CONTENT_TYPE, "application/json")
-                        .body(requestBody)
-                        .retrieve()
-                        .body(String.class);
-
-                if (responseBody == null || responseBody.isBlank()) {
-                    return "";
-                }
-
-                JsonNode response = jsonMapper.readTree(responseBody);
-                return response.path("candidates")
-                        .path(0)
-                        .path("content")
-                        .path("parts")
-                        .path(0)
-                        .path("text")
-                        .asString();
+                return executeGeminiRequestOnce(requestBody, targetModel);
             } catch (HttpServerErrorException.ServiceUnavailable exception) {
-                log.warn("Gemini returned 503 on attempt {}/{} for model {}", attempt, GEMINI_MAX_RETRIES, model);
+                log.warn("Gemini returned 503 on attempt {}/{} for model {}", attempt, GEMINI_MAX_RETRIES, targetModel);
                 if (attempt == GEMINI_MAX_RETRIES) {
                     return AI_BUSY_MESSAGE;
                 }
                 sleepBeforeRetry(attempt);
             } catch (HttpServerErrorException exception) {
-                log.error("Gemini server error {} for model {}", exception.getStatusCode(), model, exception);
+                log.error("Gemini server error {} for model {}", exception.getStatusCode(), targetModel, exception);
                 return AI_UNAVAILABLE_MESSAGE;
             } catch (ResourceAccessException exception) {
-                log.error("Gemini request failed due to network or timeout issue for model {}", model, exception);
+                log.error("Gemini request failed due to network or timeout issue for model {}", targetModel, exception);
                 return AI_UNAVAILABLE_MESSAGE;
             }
         }
@@ -484,9 +582,37 @@ public class AiChatService {
         return AI_BUSY_MESSAGE;
     }
 
+    private String executeGeminiRequestOnce(
+            Map<String, Object> requestBody,
+            String targetModel
+    ) {
+        String responseBody = restClient.post()
+                .uri("/models/{model}:generateContent", targetModel)
+                .header("x-goog-api-key", apiKey)
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .body(requestBody)
+                .retrieve()
+                .body(String.class);
+
+        if (responseBody == null || responseBody.isBlank()) {
+            return "";
+        }
+
+        JsonNode response = jsonMapper.readTree(responseBody);
+        return response.path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts")
+                .path(0)
+                .path("text")
+                .asString();
+    }
+
     private void sleepBeforeRetry(int attempt) {
         try {
-            Thread.sleep(1000L * attempt);
+            long exponentialDelay = 1000L * (1L << (attempt - 1));
+            long jitter = java.util.concurrent.ThreadLocalRandom.current().nextLong(200L, 800L);
+            Thread.sleep(exponentialDelay + jitter);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Gemini retry interrupted", exception);
