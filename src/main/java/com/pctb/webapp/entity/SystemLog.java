@@ -7,26 +7,19 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "system_log")
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@Getter @Setter @Builder
+@NoArgsConstructor @AllArgsConstructor
 public class SystemLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
-
-    @Column(nullable = false, length = 50)
-    String actor; // Admin thực hiện hành động
-
-    @Column(nullable = false, length = 100)
-    String action; // Tên hành động (LOCK_USER, UNLOCK_USER, VIEW_LOGS,...)
-
+    String actor;      // Tên admin
+    @Transient
+    String actorType;  // Ví dụ: "ADMIN"
+    String action;     // Ví dụ: "LOCK_USER", "DELETE_DOCUMENT"
+    String targetId;   // ID của user/document bị tác động
     @Column(columnDefinition = "TEXT")
-    String details; // Chi tiết: "Khóa user 'nguyenvana' vì lý do: Gửi prompt độc hại"
-
-    @Column(name = "created_at", nullable = false)
+    String details;    // Nội dung mô tả chi tiết
     LocalDateTime createdAt;
+
 }
