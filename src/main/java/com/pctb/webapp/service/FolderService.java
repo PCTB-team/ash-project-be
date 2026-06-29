@@ -34,6 +34,8 @@ public class FolderService {
 
     UserRepo userRepo;
 
+    DocumentIndexingService documentIndexingService;
+
     // Tạo folder mới cho user hiện tại, có thể nằm ở root hoặc nằm trong một folder cha hợp lệ.
     @Transactional
     // Lưu folder mới trong transaction để tránh tạo trùng hoặc lưu thiếu dữ liệu owner/parent.
@@ -133,6 +135,53 @@ public class FolderService {
     }
 
     @Transactional
+    public FolderResponse restoreMyFolder(String folderId, JwtAuthenticationToken authentication) {
+        String userId = authentication.getName();
+        String normalizedFolderId = normalizeOptionalId(folderId);
+        if (normalizedFolderId == null) {
+            throw new AppException(ErrorCode.FOLDER_NOT_FOUND);
+        }
+
+        Folder folder = folderRepo.findTrashByIdAndOwnerId(normalizedFolderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
+        LocalDateTime restoredAt = DateTimeUtils.nowUtc();
+
+        restoreFolderTree(folder, userId, restoredAt);
+        updateParentSizeCascade(folder.getParent(), safeFolderSize(folder), restoredAt);
+
+        return buildFolderResponse(folder);
+    }
+
+    private void restoreFolderTree(Folder folder, String userId, LocalDateTime restoredAt) {
+        List<Document> documents = documentRepo.findByOwnerIdAndFolderId(userId, folder.getId());
+        for (Document document : documents) {
+            if (!Boolean.TRUE.equals(document.getDeleted())) {
+                continue;
+            }
+
+            document.setDeleted(false);
+            document.setDeletedAt(null);
+            document.setUpdatedAt(restoredAt);
+            documentRepo.save(document);
+            documentIndexingService.indexDocument(document.getId());
+        }
+
+        List<Folder> childFolders = folderRepo.findByOwnerIdAndParentId(userId, folder.getId());
+        for (Folder childFolder : childFolders) {
+            if (!Boolean.TRUE.equals(childFolder.getDeleted())) {
+                continue;
+            }
+
+            restoreFolderTree(childFolder, userId, restoredAt);
+        }
+
+        folder.setDeleted(false);
+        folder.setDeletedAt(null);
+        folder.setUpdatedAt(restoredAt);
+        folderRepo.save(folder);
+    }
+
+    @Transactional
     public FolderResponse deleteMyFolderPermanently(String folderId, JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
         String normalizedFolderId = normalizeOptionalId(folderId);
@@ -200,6 +249,10 @@ public class FolderService {
         }
 
         return id.trim();
+    }
+
+    private long safeFolderSize(Folder folder) {
+        return folder.getSize() == null ? 0 : folder.getSize();
     }
 
     // Chuyển entity Folder sang DTO để trả về cho frontend.
