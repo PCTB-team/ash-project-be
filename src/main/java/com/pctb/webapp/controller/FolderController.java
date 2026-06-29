@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -61,6 +62,18 @@ public class FolderController {
         return ApiResponse.<FolderResponse>builder()
                 .message("Delete folder successfully")
                 .result(folderService.deleteMyFolder(folderId, authentication))
+                .build();
+    }
+
+    @Operation(summary = "Restore current user folder from trash")
+    @PutMapping("/{folderId}/restore")
+    public ApiResponse<FolderResponse> restoreMyFolder(
+            @PathVariable String folderId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<FolderResponse>builder()
+                .message("Restore folder successfully")
+                .result(folderService.restoreMyFolder(folderId, authentication))
                 .build();
     }
 
