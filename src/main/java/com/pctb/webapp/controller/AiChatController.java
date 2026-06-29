@@ -2,6 +2,7 @@ package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.AiChatRequest;
 import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
+import com.pctb.webapp.dto.response.AiChatHistoryPageResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
 import com.pctb.webapp.dto.response.AiChatResponse;
 import com.pctb.webapp.dto.response.ApiResponse;
@@ -16,9 +17,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,6 +54,19 @@ public class AiChatController {
         return ApiResponse.<AiDocumentChatResponse>builder()
                 .message("Chat with knowledge successfully")
                 .result(aiChatService.chatWithKnowledge(request, authentication))
+                .build();
+    }
+
+    @Operation(summary = "Get AI knowledge chat history")
+    @GetMapping("/knowledge/history")
+    public ApiResponse<AiChatHistoryPageResponse> getKnowledgeChatHistory(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "30") int size,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<AiChatHistoryPageResponse>builder()
+                .message("Get AI knowledge chat history successfully")
+                .result(aiChatService.getKnowledgeChatHistory(page, size, authentication))
                 .build();
     }
 
