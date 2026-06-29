@@ -2,21 +2,31 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
 import com.pctb.webapp.dto.response.AiAnswerSource;
+import com.pctb.webapp.dto.response.AiChatHistoryPageResponse;
+import com.pctb.webapp.dto.response.AiChatHistoryResponse;
 import com.pctb.webapp.dto.response.AiChatSourceResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
+import com.pctb.webapp.entity.AiChatHistory;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
+import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.repository.AiChatHistoryRepo;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
+import com.pctb.webapp.repository.UserRepo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
@@ -27,6 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -52,6 +63,8 @@ public class AiChatService {
     private final DocumentRepo documentRepo;
     private final FolderRepo folderRepo;
     private final QdrantService qdrantService;
+    private final AiChatHistoryRepo aiChatHistoryRepo;
+    private final UserRepo userRepo;
 
     @Value("${gemini.api-key}")
     private String apiKey;
@@ -66,12 +79,16 @@ public class AiChatService {
             DocumentTextExtractorService documentTextExtractorService,
             DocumentRepo documentRepo,
             FolderRepo folderRepo,
-            QdrantService qdrantService
+            QdrantService qdrantService,
+            AiChatHistoryRepo aiChatHistoryRepo,
+            UserRepo userRepo
     ) {
         this.documentTextExtractorService = documentTextExtractorService;
         this.documentRepo = documentRepo;
         this.folderRepo = folderRepo;
         this.qdrantService = qdrantService;
+        this.aiChatHistoryRepo = aiChatHistoryRepo;
+        this.userRepo = userRepo;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(15));
         requestFactory.setReadTimeout(Duration.ofSeconds(120));
@@ -89,12 +106,14 @@ public class AiChatService {
 
     // Luồng chat AI theo tài liệu đã lưu của user.
     // Hiện tại mới dựng khung: resolve scope, check quyền, build filter.
+    @Transactional
     public AiDocumentChatResponse chatWithKnowledge(
             AiKnowledgeChatRequest request,
             JwtAuthenticationToken authentication
     ) {
         // Lấy user hiện tại để khóa quyền truy cập và retrieval theo owner.
-        String userId = authentication.getName();
+        User currentUser = getCurrentUser(authentication);
+        String userId = currentUser.getId();
         Document inferredDocument = resolveDocumentFromMessage(request.getMessage(), userId);
         Folder inferredFolder = resolveFolderFromMessage(request.getMessage(), userId);
 
@@ -131,21 +150,124 @@ public class AiChatService {
                 answer = buildFallbackAnswerFromSources(retrievedChunks);
             }
 
-            return AiDocumentChatResponse.builder()
+            AiDocumentChatResponse response = AiDocumentChatResponse.builder()
                     .answer(answer)
                     .answerSource(AiAnswerSource.DOCUMENT)
                     .sources(toChatSources(retrievedChunks))
                     .build();
+
+            AiChatHistory history = saveKnowledgeChatHistory(
+                    currentUser,
+                    resolveHistoryDocumentId(request, inferredDocument),
+                    resolveHistoryFolderId(request, inferredFolder),
+                    request.getMessage(),
+                    response.getAnswer(),
+                    response.getAnswerSource()
+            );
+            response.setHistoryId(history.getId());
+
+            return response;
         }
 
-        return AiDocumentChatResponse.builder()
+        AiDocumentChatResponse response = AiDocumentChatResponse.builder()
                 .answer(KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE)
                 .answerSource(AiAnswerSource.DOCUMENT)
                 .sources(List.of())
                 .build();
+
+        AiChatHistory history = saveKnowledgeChatHistory(
+                currentUser,
+                resolveHistoryDocumentId(request, inferredDocument),
+                resolveHistoryFolderId(request, inferredFolder),
+                request.getMessage(),
+                response.getAnswer(),
+                response.getAnswerSource()
+        );
+        response.setHistoryId(history.getId());
+
+        return response;
     }
 
     // Suy ra scope chat từ request đầu vào.
+    @Transactional(readOnly = true)
+    public AiChatHistoryPageResponse getKnowledgeChatHistory(
+            int page,
+            int size,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        Pageable pageable = PageRequest.of(normalizePage(page), normalizePageSize(size));
+        Page<AiChatHistory> historyPage = aiChatHistoryRepo.findByUserIdOrderByCreatedAtDesc(currentUser.getId(), pageable);
+
+        return AiChatHistoryPageResponse.builder()
+                .items(historyPage.getContent().stream()
+                        .map(this::buildChatHistoryResponse)
+                        .toList())
+                .page(historyPage.getNumber())
+                .size(historyPage.getSize())
+                .totalElements(historyPage.getTotalElements())
+                .totalPages(historyPage.getTotalPages())
+                .build();
+    }
+
+    private AiChatHistory saveKnowledgeChatHistory(
+            User user,
+            String documentId,
+            String folderId,
+            String question,
+            String answer,
+            AiAnswerSource answerSource
+    ) {
+        return aiChatHistoryRepo.save(AiChatHistory.builder()
+                .user(user)
+                .documentId(documentId)
+                .folderId(folderId)
+                .question(question)
+                .answer(answer)
+                .answerSource(answerSource == null ? null : answerSource.name())
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    private AiChatHistoryResponse buildChatHistoryResponse(AiChatHistory history) {
+        return AiChatHistoryResponse.builder()
+                .historyId(history.getId())
+                .documentId(history.getDocumentId())
+                .folderId(history.getFolderId())
+                .question(history.getQuestion())
+                .answer(history.getAnswer())
+                .answerSource(history.getAnswerSource())
+                .createdAt(history.getCreatedAt() == null ? null : history.getCreatedAt().toString())
+                .build();
+    }
+
+    private User getCurrentUser(JwtAuthenticationToken authentication) {
+        return userRepo.findById(authentication.getName())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private String resolveHistoryDocumentId(
+            AiKnowledgeChatRequest request,
+            Document inferredDocument
+    ) {
+        if (hasText(request.getDocumentId())) {
+            return request.getDocumentId();
+        }
+
+        return inferredDocument == null ? null : inferredDocument.getId();
+    }
+
+    private String resolveHistoryFolderId(
+            AiKnowledgeChatRequest request,
+            Folder inferredFolder
+    ) {
+        if (hasText(request.getFolderId())) {
+            return request.getFolderId();
+        }
+
+        return inferredFolder == null ? null : inferredFolder.getId();
+    }
+
     private AiKnowledgeScope resolveKnowledgeScope(
             AiKnowledgeChatRequest request,
             Document inferredDocument,
@@ -381,6 +503,18 @@ public class AiChatService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private int normalizePageSize(int size) {
+        if (size < 1) {
+            return 30;
+        }
+
+        return Math.min(size, 100);
     }
 
     private Document resolveDocumentFromMessage(String message, String userId) {

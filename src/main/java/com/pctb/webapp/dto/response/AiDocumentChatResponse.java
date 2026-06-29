@@ -18,6 +18,8 @@ import java.util.List;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AiDocumentChatResponse {
+    String historyId;
+
     // Nội dung câu trả lời cuối cùng của AI.
     String answer;
 
