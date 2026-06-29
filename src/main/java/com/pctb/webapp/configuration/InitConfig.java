@@ -91,36 +91,36 @@ public class InitConfig {
 
             // --- HỆ THỐNG GÓI BẬC THANG: GO (2GB) ---
             StoragePlan planGo1M = StoragePlan.builder()
-                    .id("PLAN_GO_1M").planName("Gói GO - 1 Tháng (Hạn mức 2GB)")
+                    .id("PLAN_GO_1M").planName("GO Plan - 1 Month (2GB quota)")
                     .quotaSize(2L * 1024 * 1024 * 1024).price(2000L).durationMonths(1).build();
 
             StoragePlan planGo1Y = StoragePlan.builder()
-                    .id("PLAN_GO_1Y").planName("Gói GO - 1 Năm (Hạn mức 2GB) [Ưu đãi]")
+                    .id("PLAN_GO_1Y").planName("GO Plan - 1 Year (2GB quota) [Discount]")
                     .quotaSize(2L * 1024 * 1024 * 1024).price(20000L).durationMonths(12).build();
 
             // --- HỆ THỐNG GÓI BẬC THANG: PLUS (5GB) ---
             StoragePlan planPlus1M = StoragePlan.builder()
-                    .id("PLAN_PLUS_1M").planName("Gói PLUS - 1 Tháng (Hạn mức 5GB)")
+                    .id("PLAN_PLUS_1M").planName("PLUS Plan - 1 Month (5GB quota)")
                     .quotaSize(5L * 1024 * 1024 * 1024).price(5000L).durationMonths(1).build();
 
             StoragePlan planPlus1Y = StoragePlan.builder()
-                    .id("PLAN_PLUS_1Y").planName("Gói PLUS - 1 Năm (Hạn mức 5GB) [Ưu đãi]")
+                    .id("PLAN_PLUS_1Y").planName("PLUS Plan - 1 Year (5GB quota) [Discount]")
                     .quotaSize(5L * 1024 * 1024 * 1024).price(50000L).durationMonths(12).build();
 
             // --- HỆ THỐNG GÓI BẬC THANG: PRO (10GB) ---
             StoragePlan planPro1M = StoragePlan.builder()
-                    .id("PLAN_PRO_1M").planName("Gói PRO - 1 Tháng (Hạn mức 10GB)")
+                    .id("PLAN_PRO_1M").planName("PRO Plan - 1 Month (10GB quota)")
                     .quotaSize(10L * 1024 * 1024 * 1024).price(10000L).durationMonths(1).build();
 
             StoragePlan planPro1Y = StoragePlan.builder()
-                    .id("PLAN_PRO_1Y").planName("Gói PRO - 1 Năm (Hạn mức 10GB) [Ưu đãi]")
+                    .id("PLAN_PRO_1Y").planName("PRO Plan - 1 Year (10GB quota) [Discount]")
                     .quotaSize(10L * 1024 * 1024 * 1024).price(100000L).durationMonths(12).build();
 
             planRepo.save(planGo1M); planRepo.save(planGo1Y);
             planRepo.save(planPlus1M); planRepo.save(planPlus1Y);
             planRepo.save(planPro1M); planRepo.save(planPro1Y);
 
-            log.info("[SWP391] Hệ thống 6 gói cước bậc thang đã khởi tạo thành công.");
+            log.info("[SWP391] Six tiered storage plans have been initialized successfully.");
         };
     }
 }

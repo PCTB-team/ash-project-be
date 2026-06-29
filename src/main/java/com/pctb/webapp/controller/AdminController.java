@@ -15,7 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/admin") // Tự động nhận diện context-path /api/v1 từ file cấu hình của nhóm
+@RequestMapping("/admin")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AdminController {
@@ -23,9 +23,9 @@ public class AdminController {
     AdminService adminService;
 
     // ==========================================
-    // 📊 1. CÁC API DÀNH CHO TRANG 1: DASHBOARD TỔNG QUAN
+    // 📊 1. TRANG 1: DASHBOARD TỔNG QUAN
     // ==========================================
-    @Operation(summary = "Trang 1: Lấy số liệu Stat Cards lớn và mảng đồ thị nạp Chart thời gian thực")
+    @Operation(summary = "Page 1: Get dashboard stat cards and real-time chart data")
     @GetMapping("/dashboard/stats")
     public ApiResponse<DashboardStatsResponse> getDashboardStats() {
         return ApiResponse.<DashboardStatsResponse>builder()
@@ -33,7 +33,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 1 & 2: Xem nhật ký Audit Trail phân loại 3 phần rạch ròi (logType: ADMIN_ACTION, USER_ACTION, DOCUMENT_LOG)")
+    @Operation(summary = "Pages 1 and 2: Get categorized audit logs (ADMIN_ACTION, USER_ACTION, DOCUMENT_LOG)")
     @GetMapping("/logs")
     public ApiResponse<Page<SystemLog>> getSystemAuditLogs(
             @RequestParam(defaultValue = "0") int page,
@@ -46,9 +46,9 @@ public class AdminController {
     }
 
     // ==========================================
-    // 👥 2. CÁC API DÀNH CHO TRANG 2: QUẢN LÝ NGƯỜI DÙNG (USERS)
+    // 👥 2. TRANG 2: QUẢN LÝ NGƯỜI DÙNG (USERS)
     // ==========================================
-    @Operation(summary = "Trang 2: Tìm kiếm, lọc quyền, lọc trạng thái Active/Banned và phân trang User")
+    @Operation(summary = "Page 2: Search, filter by role/status, and paginate users")
     @GetMapping("/users")
     public ApiResponse<Page<UserResponse>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
@@ -62,7 +62,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 2: Xem hồ sơ thông tin hành chính chi tiết của một sinh viên")
+    @Operation(summary = "Page 2: Get detailed administrative user profile")
     @GetMapping("/users/{userId}")
     public ApiResponse<UserResponse> getUserDetail(@PathVariable String userId) {
         return ApiResponse.<UserResponse>builder()
@@ -70,7 +70,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 2: Cấp quyền / Thay đổi role tài khoản (User ↔ Admin)")
+    @Operation(summary = "Page 2: Update account role (User/Admin)")
     @PutMapping("/users/{userId}/role")
     public ApiResponse<String> changeUserRole(
             @PathVariable String userId,
@@ -80,12 +80,12 @@ public class AdminController {
         String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
         adminService.updateUserRole(userId, roleName, adminName);
         return ApiResponse.<String>builder()
-                .message("User privilege updated to " + roleName.toUpperCase() + " successfully")
+                .message("User privilege updated successfully")
                 .result("UPDATED")
                 .build();
     }
 
-    @Operation(summary = "Trang 2: Khóa tài khoản người dùng vi phạm (Banned) kèm lưu vết log")
+    @Operation(summary = "Page 2: Lock a violating user account and write an audit log")
     @PutMapping("/users/{userId}/lock")
     public ApiResponse<String> lockUser(
             @PathVariable String userId,
@@ -100,7 +100,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 2: Mở khóa tài khoản người dùng hoạt động trở lại")
+    @Operation(summary = "Page 2: Unlock a user account")
     @PutMapping("/users/{userId}/unlock")
     public ApiResponse<String> unlockUser(@PathVariable String userId, @AuthenticationPrincipal Jwt jwt) {
         String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
@@ -111,7 +111,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 2: Xóa vĩnh viễn tài khoản sinh viên vi phạm và cắt xé lịch sử ngoại")
+    @Operation(summary = "Page 2: Permanently delete a violating user account")
     @DeleteMapping("/users/{userId}")
     public ApiResponse<String> deleteUser(@PathVariable String userId, @AuthenticationPrincipal Jwt jwt) {
         String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
@@ -123,11 +123,9 @@ public class AdminController {
     }
 
     // ==========================================
-    // 📚 3. CÁC API DÀNH CHO TRANG 3: QUẢN LÝ TÀI LIỆU (DOCUMENTS)
+    // 📚 3. TRANG 3: GIÁM SÁT TÀI LIỆU (DOCUMENTS)
     // ==========================================
-
-    // 🌟 SỬA ĐỒNG BỘ: Đón tiếp kiểu Page<AdminDocumentResponse> thay thế Page<Document> thô để giấu link Cloudinary bảo mật
-    @Operation(summary = "Trang 3: Giám sát, tìm kiếm và phân trang tài liệu (Bảo mật: Giấu link fileUrl)")
+    @Operation(summary = "Page 3: Monitor, search, and paginate documents")
     @GetMapping("/documents")
     public ApiResponse<Page<AdminDocumentResponse>> getAllDocuments(
             @RequestParam(defaultValue = "0") int page,
@@ -140,7 +138,7 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 3: Admin hạ gỡ và xóa mềm tài liệu vi phạm quy chế StudyHub")
+    @Operation(summary = "Page 3: Move a policy-violating document to system trash")
     @DeleteMapping("/documents/{docId}")
     public ApiResponse<String> deleteDocument(@PathVariable String docId, @AuthenticationPrincipal Jwt jwt) {
         String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
@@ -151,11 +149,91 @@ public class AdminController {
                 .build();
     }
 
-    @Operation(summary = "Trang 3: Lấy số liệu lưới nhỏ trên đỉnh bảng (Tổng dung lượng, tệp lớn nhất, uploader đỉnh cao)")
+    @Operation(summary = "Page 3: Get document summary statistics")
     @GetMapping("/documents/statistics")
     public ApiResponse<AdminDocumentStatsResponse> getDocumentStatsGrid() {
         return ApiResponse.<AdminDocumentStatsResponse>builder()
                 .result(adminService.getDocumentGridStatistics())
+                .build();
+    }
+
+    // ==========================================
+    // 👥 4. TRANG 4: QUẢN LÝ NHÓM (STUDY GROUPS)
+    // ==========================================
+    @Operation(summary = "Page 4: Monitor, search, and paginate study groups")
+    @GetMapping("/groups")
+    public ApiResponse<Page<AdminGroupResponse>> getAllGroups(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.<Page<AdminGroupResponse>>builder()
+                .result(adminService.getAllGroupsPaged(page, size, keyword))
+                .build();
+    }
+
+    @Operation(summary = "Page 4: Get study group details by ID")
+    @GetMapping("/groups/{groupId}")
+    public ApiResponse<AdminGroupResponse> getGroupDetail(@PathVariable String groupId) {
+        return ApiResponse.<AdminGroupResponse>builder()
+                .result(adminService.getGroupDetail(groupId))
+                .build();
+    }
+
+    @Operation(summary = "Page 4: Get study group statistics")
+    @GetMapping("/groups/statistics")
+    public ApiResponse<AdminGroupStatsResponse> getGroupStats() {
+        return ApiResponse.<AdminGroupStatsResponse>builder()
+                .result(adminService.getGroupStatistics())
+                .build();
+    }
+
+    // 🌟 ĐÃ ĐỒNG BỘ FIX LỖI: Bổ sung tham số `@AuthenticationPrincipal Jwt jwt` và đẩy `adminName` vào Service để lưu nhật ký Audit Log
+    @Operation(summary = "Page 4: Permanently delete a policy-violating study group")
+    @DeleteMapping("/groups/{groupId}")
+    public ApiResponse<String> deleteGroup(@PathVariable String groupId, @AuthenticationPrincipal Jwt jwt) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        adminService.deleteGroup(groupId, adminName);
+        return ApiResponse.<String>builder()
+                .message("Study group dismantled successfully")
+                .result("GROUP_DELETED")
+                .build();
+    }
+
+    // ==========================================
+    // 💳 5. TRANG 5: QUẢN LÝ THANH TOÁN (PAYMENTS)
+    // ==========================================
+    @Operation(summary = "Page 5: View and paginate user payment history")
+    @GetMapping("/payments")
+    public ApiResponse<Page<AdminTransactionResponse>> getAllPayments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status
+    ) {
+        return ApiResponse.<Page<AdminTransactionResponse>>builder()
+                .result(adminService.getAllPaymentsPaged(page, size, status))
+                .build();
+    }
+
+    // ==========================================
+    // 🤖 6. TRANG 6: THỐNG KÊ AI (AI STATS)
+    // ==========================================
+    @Operation(summary = "Page 6: Get AI chatbot usage statistics and charts")
+    @GetMapping("/ai/statistics")
+    public ApiResponse<AdminAiStatsResponse> getAiStats() {
+        return ApiResponse.<AdminAiStatsResponse>builder()
+                .result(adminService.getAiStatistics())
+                .build();
+    }
+
+    // ==========================================
+    // ⚙️ 7. TRANG 7: CÀI ĐẶT HỆ THỐNG
+    // ==========================================
+    @Operation(summary = "Page 7: Get administrative system settings")
+    @GetMapping("/settings")
+    public ApiResponse<SystemSettingsResponse> getSettings() {
+        return ApiResponse.<SystemSettingsResponse>builder()
+                .result(adminService.getSystemSettings())
                 .build();
     }
 }

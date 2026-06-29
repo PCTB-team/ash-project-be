@@ -197,8 +197,8 @@ public class GroupService {
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_JOINED,
-                "Thanh vien moi tham gia",
-                currentUser.getFullname() + " da tham gia nhom \"" + group.getName() + "\".",
+                "New member joined",
+                currentUser.getFullname() + " joined group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -234,11 +234,11 @@ public class GroupService {
                         ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
                         : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "Ban da duoc cap quyen upload"
-                        : "Quyen upload da bi thu hoi",
+                        ? "You have been granted upload permission"
+                        : "Upload permission has been revoked",
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "Leader da cho phep ban tai tai lieu len nhom \"" + group.getName() + "\"."
-                        : "Ban khong con quyen tai tai lieu len nhom \"" + group.getName() + "\".",
+                        ? "The leader allowed you to upload documents to group \"" + group.getName() + "\"."
+                        : "You no longer have permission to upload documents to group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -254,11 +254,11 @@ public class GroupService {
                         ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
                         : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "Quyen upload da duoc cap"
-                        : "Quyen upload da bi thu hoi",
+                        ? "Upload permission granted"
+                        : "Upload permission has been revoked",
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? targetUser.getFullname() + " da duoc cap quyen upload trong nhom \"" + group.getName() + "\"."
-                        : targetUser.getFullname() + " da bi thu hoi quyen upload trong nhom \"" + group.getName() + "\".",
+                        ? targetUser.getFullname() + " was granted upload permission in group \"" + group.getName() + "\"."
+                        : targetUser.getFullname() + " had upload permission revoked in group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -311,8 +311,8 @@ public class GroupService {
                 kickedUser,
                 currentUser,
                 NotificationType.GROUP_MEMBER_KICKED,
-                "Ban da bi xoa khoi nhom",
-                "Ban da bi leader xoa khoi nhom \"" + group.getName() + "\".",
+                "You have been removed from the group",
+                "The leader removed you from group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -325,8 +325,8 @@ public class GroupService {
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_KICKED,
-                "Thanh vien da bi xoa khoi nhom",
-                kickedUser.getFullname() + " da bi xoa khoi nhom \"" + group.getName() + "\".",
+                "Member removed from the group",
+                kickedUser.getFullname() + " was removed from group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -363,8 +363,8 @@ public class GroupService {
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_LEFT,
-                "Thanh vien da roi nhom",
-                currentUser.getFullname() + " da roi khoi nhom \"" + group.getName() + "\".",
+                "Member left the group",
+                currentUser.getFullname() + " left group \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -423,8 +423,8 @@ public class GroupService {
                 savedGroup,
                 currentUser,
                 NotificationType.GROUP_PASSWORD_CHANGED,
-                "Mat khau nhom da thay doi",
-                "Mat khau cua nhom \"" + savedGroup.getName() + "\" da duoc cap nhat.",
+                "Group password changed",
+                "The password for group \"" + savedGroup.getName() + "\" has been updated.",
                 NotificationType.GROUP,
                 savedGroup.getId(),
                 savedGroup.getName(),
