@@ -35,33 +35,33 @@ public final class DateTimeUtils {
 
         Duration duration = Duration.between(dateTime, nowUtc());
         if (duration.isNegative() || duration.getSeconds() < 5) {
-            return "v\u1eeba xong";
+            return "just now";
         }
 
         long seconds = duration.getSeconds();
         if (seconds < 60) {
-            return seconds + " gi\u00e2y tr\u01b0\u1edbc";
+            return seconds + " seconds ago";
         }
 
         long minutes = duration.toMinutes();
         if (minutes < 60) {
-            return minutes + " ph\u00fat tr\u01b0\u1edbc";
+            return minutes + " minutes ago";
         }
 
         long hours = duration.toHours();
         if (hours < 24) {
-            return hours + " gi\u1edd tr\u01b0\u1edbc";
+            return hours + " hours ago";
         }
 
         long days = duration.toDays();
         if (days < 30) {
-            return days + " ng\u00e0y tr\u01b0\u1edbc";
+            return days + " days ago";
         }
 
         if (days < 365) {
-            return days / 30 + " th\u00e1ng tr\u01b0\u1edbc";
+            return days / 30 + " months ago";
         }
 
-        return days / 365 + " n\u0103m tr\u01b0\u1edbc";
+        return days / 365 + " years ago";
     }
 }

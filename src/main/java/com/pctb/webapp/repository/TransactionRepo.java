@@ -1,7 +1,10 @@
 package com.pctb.webapp.repository;
 
 import com.pctb.webapp.entity.Transaction;
+import com.pctb.webapp.entity.TransactionStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,4 +25,6 @@ public interface TransactionRepo extends JpaRepository<Transaction, String> {
      * SỬA LỖI: Chuyển 'long' thành 'Long' để đồng bộ với kiểu dữ liệu của Entity
      */
     Optional<Transaction> findByOrderCode(Long orderCode);
+
+    Page<Transaction> findByStatus(TransactionStatus status, Pageable pageable);
 }

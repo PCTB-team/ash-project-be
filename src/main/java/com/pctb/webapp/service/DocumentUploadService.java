@@ -46,6 +46,8 @@ public class DocumentUploadService {
 
     QdrantService qdrantService;
 
+    LogService logService;
+
     @Value("${app.upload.max-user-storage}")
     @NonFinal
     long maxUserStorage;
@@ -121,6 +123,13 @@ public class DocumentUploadService {
         }
 
         updateFolderSizeCascade(folder, file.getSize());
+        logService.log(
+                owner.getUsername(),
+                "DOCUMENT_LOG",
+                "USER_UPLOAD_DOCUMENT",
+                document.getId(),
+                "User " + owner.getUsername() + " uploaded document [" + document.getFileName() + "]"
+        );
 
         return DocumentUploadResponse.builder()
                 .documentId(document.getId())
@@ -210,34 +219,34 @@ public class DocumentUploadService {
 
         Duration duration = Duration.between(uploadedAt, LocalDateTime.now());
         if (duration.isNegative() || duration.getSeconds() < 5) {
-            return "vừa xong";
+            return "just now";
         }
 
         long seconds = duration.getSeconds();
         if (seconds < 60) {
-            return seconds + " giây trước";
+            return seconds + " seconds ago";
         }
 
         long minutes = duration.toMinutes();
         if (minutes < 60) {
-            return minutes + " phút trước";
+            return minutes + " minutes ago";
         }
 
         long hours = duration.toHours();
         if (hours < 24) {
-            return hours + " giờ trước";
+            return hours + " hours ago";
         }
 
         long days = duration.toDays();
         if (days < 30) {
-            return days + " ngày trước";
+            return days + " days ago";
         }
 
         if (days < 365) {
-            return days / 30 + " tháng trước";
+            return days / 30 + " months ago";
         }
 
-        return days / 365 + " năm trước";
+        return days / 365 + " years ago";
     }
 
     // Kiểm tra tổng dung lượng sau upload hoặc replace có vượt giới hạn storage của user hay không.
