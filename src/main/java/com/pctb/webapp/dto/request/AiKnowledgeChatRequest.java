@@ -20,6 +20,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AiKnowledgeChatRequest {
     // Nếu có giá trị, AI chỉ search trong một tài liệu cụ thể.
+    String conversationId;
+
     String documentId;
 
     // Nếu có giá trị, AI chỉ search trong một folder cụ thể.
