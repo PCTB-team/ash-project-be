@@ -156,6 +156,7 @@ public class AuthenService {
         if (!user.isVerified()) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
         }
+        ensureAccountNonLocked(user);
         // Đoạn kiểm tra mật khẩu
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             recordFailedLoginAttempt(identifier);
@@ -213,6 +214,7 @@ public class AuthenService {
         if (!user.isVerified()) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
         }
+        ensureAccountNonLocked(user);
         // Tạo ra new accessToken từ user .
         String newAccessToken = generateToken(user, accessTokenValidSeconds, "access");
 
@@ -642,6 +644,9 @@ public class AuthenService {
                 .fullname(fullname != null && !fullname.isBlank() ? fullname : email)
                 .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                 .verified(true)
+                .accountNonLocked(true)
+                .storageQuota(524288000L)
+                .storageUsed(0L)
                 .roles(Set.of(userRole))
                 .build();
 
@@ -662,6 +667,7 @@ public class AuthenService {
             user.setVerified(true);
             user = userRepo.save(user);
         }
+        ensureAccountNonLocked(user);
 
         recordSuccessfulLogin(user);
 
@@ -675,5 +681,11 @@ public class AuthenService {
                 .refreshToken(refreshToken)
                 .authenticated(true)
                 .build();
+    }
+
+    private void ensureAccountNonLocked(User user) {
+        if (!user.isAccountNonLocked()) {
+            throw new AppException(ErrorCode.ACCOUNT_IS_LOCKED);
+        }
     }
 }

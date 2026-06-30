@@ -17,6 +17,8 @@ import java.util.Optional;
 public interface UserLoginHistoryRepo extends JpaRepository<UserLoginHistory, String> {
     Optional<UserLoginHistory> findByUserAndLoginDate(User user, LocalDate loginDate);
 
+    Optional<UserLoginHistory> findTopByUserOrderByLoginDateDesc(User user);
+
     @Query("select distinct h.loginDate from UserLoginHistory h where h.user = :user order by h.loginDate desc")
     List<LocalDate> findLoginDatesByUserOrderByLoginDateDesc(@Param("user") User user);
 

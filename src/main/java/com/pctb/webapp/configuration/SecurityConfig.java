@@ -41,7 +41,7 @@ public class SecurityConfig {
     private String corsAllowedOriginPatterns;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity httpSecurity, LockedAccountFilter lockedAccountFilter) throws Exception {
         httpSecurity
                 .cors(cors -> {
                 })
@@ -91,7 +91,8 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer
                         .decoder(jwtDecoder())
                         .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                ));
+                ))
+                .addFilterAfter(lockedAccountFilter, BearerTokenAuthenticationFilter.class);
 
 
         return httpSecurity.build();

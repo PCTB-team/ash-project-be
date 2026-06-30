@@ -3,6 +3,7 @@ package com.pctb.webapp.controller;
 import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
 import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
+import com.pctb.webapp.dto.request.AdminSetUserStoragePlanRequest;
 import com.pctb.webapp.dto.request.LockUserRequest;
 import com.pctb.webapp.dto.response.*;
 import com.pctb.webapp.entity.SystemLog;
@@ -13,10 +14,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -87,6 +90,20 @@ public class AdminController {
         return ApiResponse.<String>builder()
                 .message("User privilege updated successfully")
                 .result("UPDATED")
+                .build();
+    }
+
+    @Operation(summary = "Page 2: Manually assign storage plan to a user after payment reconciliation")
+    @PutMapping("/users/{userId}/storage-plan")
+    public ApiResponse<UserResponse> setUserStoragePlan(
+            @PathVariable String userId,
+            @RequestBody AdminSetUserStoragePlanRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        return ApiResponse.<UserResponse>builder()
+                .message("User storage plan updated successfully")
+                .result(adminService.setUserStoragePlan(userId, request, adminName))
                 .build();
     }
 
@@ -232,6 +249,29 @@ public class AdminController {
     ) {
         return ApiResponse.<Page<AdminTransactionResponse>>builder()
                 .result(adminService.getAllPaymentsPaged(page, size, status))
+                .build();
+    }
+
+    @Operation(summary = "Page 5: Get successful payment revenue grouped by hour, day, month, or year")
+    @GetMapping("/payments/revenue")
+    public ApiResponse<AdminRevenueStatsResponse> getPaymentRevenueStats(
+            @RequestParam(defaultValue = "DAY") String granularity,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to
+    ) {
+        return ApiResponse.<AdminRevenueStatsResponse>builder()
+                .result(adminService.getRevenueStats(granularity, from, to))
+                .build();
+    }
+
+    @Operation(summary = "Page 5: Get successful payment revenue grouped by month")
+    @GetMapping("/payments/revenue/monthly")
+    public ApiResponse<AdminRevenueStatsResponse> getMonthlyPaymentRevenueStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to
+    ) {
+        return ApiResponse.<AdminRevenueStatsResponse>builder()
+                .result(adminService.getRevenueStats("MONTH", from, to))
                 .build();
     }
 
