@@ -20,6 +20,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -36,6 +38,11 @@ public class UserService {
     @Value("${app.upload.max-user-storage}")
     @NonFinal
     long maxUserStorage;
+
+    private static final long FREE_STORAGE_QUOTA = 500L * 1024 * 1024;
+    private static final long GO_STORAGE_QUOTA = 2L * 1024 * 1024 * 1024;
+    private static final long PLUS_STORAGE_QUOTA = 5L * 1024 * 1024 * 1024;
+    private static final long PRO_STORAGE_QUOTA = 10L * 1024 * 1024 * 1024;
 
     // Lấy toàn bộ user trong hệ thống và chuyển sang DTO để tránh trả trực tiếp entity.
     public List<UserResponse> getUser() {
@@ -67,11 +74,20 @@ public class UserService {
                 ? 0
                 : Math.round(usedStorage * 10000.0 / maxStorage) / 100.0;
 
+        String planCode = resolveStoragePlanCode(maxStorage);
+        LocalDateTime storageExpiredAt = user.getStorageExpiredAt();
+
         return UserStorageResponse.builder()
                 .usedStorage(usedStorage)
                 .maxStorage(maxStorage) // Trả về hạn mức dung lượng gói cước thực tế của User
                 .remainingStorage(remainingStorage)
                 .usagePercent(usagePercent)
+                .planCode(planCode)
+                .planName(resolveStoragePlanName(planCode))
+                .planActive(isStoragePlanActive(planCode, storageExpiredAt))
+                .storageExpiredAt(formatStorageExpiredAt(storageExpiredAt))
+                .daysUntilExpired(calculateDaysUntilExpired(storageExpiredAt))
+                .canUpgrade(canUpgradeStoragePlan(planCode))
                 .build();
     }
 
@@ -204,5 +220,62 @@ public class UserService {
     // Kiểm tra chuỗi có nội dung thật sau khi bỏ khoảng trắng hay không.
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    // Quy đổi quota trong DB thành mã gói để FE biết user đang dùng FREE, GO, PLUS hay PRO.
+    private String resolveStoragePlanCode(long storageQuota) {
+        if (storageQuota == FREE_STORAGE_QUOTA) {
+            return "FREE";
+        }
+        if (storageQuota == GO_STORAGE_QUOTA) {
+            return "GO";
+        }
+        if (storageQuota == PLUS_STORAGE_QUOTA) {
+            return "PLUS";
+        }
+        if (storageQuota == PRO_STORAGE_QUOTA) {
+            return "PRO";
+        }
+
+        return "CUSTOM";
+    }
+
+    // Trả tên gói dễ đọc cho FE hiển thị trực tiếp trong trang hồ sơ.
+    private String resolveStoragePlanName(String planCode) {
+        return switch (planCode) {
+            case "GO" -> "GO Plan";
+            case "PLUS" -> "PLUS Plan";
+            case "PRO" -> "PRO Plan";
+            case "CUSTOM" -> "Custom Plan";
+            default -> "Free Plan";
+        };
+    }
+
+    // Kiểm tra gói còn hiệu lực hay không; gói FREE không có ngày hết hạn nên luôn active.
+    private boolean isStoragePlanActive(String planCode, LocalDateTime storageExpiredAt) {
+        if ("FREE".equals(planCode)) {
+            return true;
+        }
+
+        return storageExpiredAt != null && storageExpiredAt.isAfter(LocalDateTime.now());
+    }
+
+    // Tính số ngày còn lại của gói trả phí để FE hiển thị cảnh báo sắp hết hạn.
+    private long calculateDaysUntilExpired(LocalDateTime storageExpiredAt) {
+        if (storageExpiredAt == null || !storageExpiredAt.isAfter(LocalDateTime.now())) {
+            return 0;
+        }
+
+        return ChronoUnit.DAYS.between(LocalDateTime.now(), storageExpiredAt);
+    }
+
+    // Format ngày hết hạn theo ISO string; gói FREE sẽ trả null vì không có hạn.
+    private String formatStorageExpiredAt(LocalDateTime storageExpiredAt) {
+        return storageExpiredAt == null ? null : storageExpiredAt.toString();
+    }
+
+    // FE dùng cờ này để quyết định có hiện nút nâng cấp gói hay không.
+    private boolean canUpgradeStoragePlan(String planCode) {
+        return !"PRO".equals(planCode) && !"CUSTOM".equals(planCode);
     }
 }
