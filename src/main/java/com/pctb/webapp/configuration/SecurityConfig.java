@@ -9,13 +9,14 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -25,7 +26,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 
 @Configuration
 @EnableWebSecurity
@@ -106,12 +110,25 @@ public class SecurityConfig {
 
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        jwtGrantedAuthoritiesConverter.setAuthoritiesClaimName("scope");
-        jwtGrantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwtGrantedAuthoritiesConverter);
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Collection<GrantedAuthority> authorities = new ArrayList<>();
+            Object scopeClaim = jwt.getClaim("scope");
+            if (scopeClaim instanceof String scope) {
+                Arrays.stream(scope.split("\\s+"))
+                        .map(String::trim)
+                        .filter(role -> !role.isBlank())
+                        .forEach(role -> {
+                            String normalizedRole = role.toUpperCase(Locale.ROOT);
+                            String roleWithoutPrefix = normalizedRole.startsWith("ROLE_")
+                                    ? normalizedRole.substring("ROLE_".length())
+                                    : normalizedRole;
+                            authorities.add(new SimpleGrantedAuthority(roleWithoutPrefix));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_" + roleWithoutPrefix));
+                        });
+            }
+            return authorities;
+        });
         return jwtAuthenticationConverter;
     }
 
