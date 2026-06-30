@@ -269,7 +269,9 @@ public class AuthenService {
         String savedRefreshToken = redisService.get(key);
 
         if (savedRefreshToken == null) {
-            throw new AppException(ErrorCode.ACCOUNT_ALREADY_LOGGED_OUT);
+            return LogoutResponse.builder()
+                    .loggedOut(true)
+                    .build();
         }
 
         if (!savedRefreshToken.equals(refreshToken)) {

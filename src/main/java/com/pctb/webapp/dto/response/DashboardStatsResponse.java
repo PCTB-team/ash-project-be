@@ -14,6 +14,8 @@ public class DashboardStatsResponse {
     // 👥 1. NHÓM USER
     long totalUsers;
     long activeUsersRightNow;
+    long newUsersThisMonth;
+    long activeUsers;
 
     // 💳 2. NHÓM DOANH THU (PAYOS)
     double totalRevenue;
@@ -26,6 +28,7 @@ public class DashboardStatsResponse {
 
     // 📚 4. NHÓM TƯƠNG TÁC (ENGAGEMENT)
     long totalDocuments;
+    long newDocsThisMonth;
     long totalGroups; // 🌟 Thêm đếm tổng nhóm theo yêu cầu Stat Card số 3 của FE
     long pendingReports;
 

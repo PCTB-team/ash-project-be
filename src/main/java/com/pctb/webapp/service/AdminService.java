@@ -1,6 +1,10 @@
 package com.pctb.webapp.service;
 
-import com.pctb.webapp.dto.request.LockUserRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
+import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
+import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
 import com.pctb.webapp.dto.response.*;
 import com.pctb.webapp.entity.*;
 import com.pctb.webapp.exception.AppException;
@@ -31,10 +35,15 @@ public class AdminService {
     GroupFileRepo groupFileRepo;
     GroupMessageRepo groupMessageRepo;
     TransactionRepo transactionRepo;
+    StoragePlanRepo storagePlanRepo;
     UserLoginHistoryRepo userLoginHistoryRepo;
     SystemLogRepo systemLogRepo;
     LogService logService;
     UserMapper userMapper;
+    RedisService redisService;
+    ObjectMapper objectMapper;
+
+    static String ADMIN_SETTINGS_KEY = "admin:system:settings";
 
     // =========================================================================
     // 📊 TRANG 1: LOGIC DASHBOARD TỔNG QUAN (Đồng bộ Stat Cards, Charts, Hoạt động gần đây)
@@ -57,6 +66,18 @@ public class AdminService {
         double revenueThisMonth = 0;
         int currentMonth = now.getMonthValue();
         int currentYear = now.getYear();
+
+        long newUsersThisMonth = allUsers.stream()
+                .filter(user -> user.getCreatedAt() != null
+                        && user.getCreatedAt().getMonthValue() == currentMonth
+                        && user.getCreatedAt().getYear() == currentYear)
+                .count();
+
+        long newDocsThisMonth = allDocs.stream()
+                .filter(document -> document.getCreatedAt() != null
+                        && document.getCreatedAt().getMonthValue() == currentMonth
+                        && document.getCreatedAt().getYear() == currentYear)
+                .count();
 
         for (com.pctb.webapp.entity.Transaction tx : allTransactions) {
             double amount = tx.getAmount() != null ? tx.getAmount().doubleValue() : 0.0;
@@ -141,9 +162,11 @@ public class AdminService {
 
         return DashboardStatsResponse.builder()
                 .totalUsers(totalUsers).activeUsersRightNow(activeUsersRightNow == 0 ? 3 : activeUsersRightNow)
+                .newUsersThisMonth(newUsersThisMonth).activeUsers(activeUsersRightNow)
                 .totalRevenue(totalRevenue).revenueThisMonth(revenueThisMonth)
                 .totalStorageUsedBytes(totalStorageUsedBytes).totalStorageCapacityBytes(totalStorageCapacityBytes)
                 .fileTypeDistribution(fileTypeDistribution).totalDocuments(totalDocuments).totalGroups(totalGroups)
+                .newDocsThisMonth(newDocsThisMonth)
                 .pendingReports(pendingReports).monthlyUserGrowth(userGrowthTrend).monthlyRevenueTrend(revenueTrend)
                 .weeklyUploadTrend(weeklyUploadTrend).recentActivities(recentActivities)
                 .build();
@@ -382,6 +405,7 @@ public class AdminService {
     // =========================================================================
     // 👥 TRANG 4: QUẢN LÝ NHÓM HỌC TẬP (STUDY GROUPS)
     // =========================================================================
+    @Transactional(readOnly = true)
     public Page<AdminGroupResponse> getAllGroupsPaged(int page, int size, String keyword) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<StudyGroup> groupPage;
@@ -444,6 +468,40 @@ public class AdminService {
         logService.logAction(adminName, "DELETE_GROUP", "Deleted group: " + groupName);
     }
 
+    @Transactional
+    public String updateGroupStatus(String groupId, AdminUpdateGroupStatusRequest request, String adminName) {
+        StudyGroup group = studyGroupRepo.findById(groupId)
+                .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
+
+        boolean active = resolveActiveGroupStatus(request);
+        group.setInviteEnabled(active);
+        group.setUpdatedAt(LocalDateTime.now());
+        studyGroupRepo.save(group);
+
+        String status = active ? "ACTIVE" : "BANNED";
+        logService.log(adminName, "ADMIN_ACTION", "UPDATE_GROUP_STATUS", group.getId(),
+                "Admin " + adminName + " changed group [" + group.getName() + "] status to " + status);
+        return status;
+    }
+
+    private boolean resolveActiveGroupStatus(AdminUpdateGroupStatusRequest request) {
+        if (request == null) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        if (request.getActive() != null) {
+            return request.getActive();
+        }
+        String status = request.getStatus();
+        if (status == null || status.isBlank()) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        return switch (status.trim().toUpperCase()) {
+            case "ACTIVE", "UNLOCKED", "ENABLED" -> true;
+            case "BANNED", "LOCKED", "DISABLED" -> false;
+            default -> throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        };
+    }
+
     private AdminGroupResponse toAdminGroupResponse(StudyGroup group) {
         return toAdminGroupResponse(group, null);
     }
@@ -482,6 +540,7 @@ public class AdminService {
     // =========================================================================
     // 💳 TRANG 5: QUẢN LÝ THANH TOÁN & DOANH THU (Ánh xạ AdminTransactionResponse)
     // =========================================================================
+    @Transactional(readOnly = true)
     public Page<AdminTransactionResponse> getAllPaymentsPaged(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<com.pctb.webapp.entity.Transaction> transactionPage;
@@ -510,6 +569,52 @@ public class AdminService {
                 .build());
     }
 
+    public List<AdminPlanResponse> getPlans() {
+        LocalDateTime now = LocalDateTime.now();
+        return storagePlanRepo.findAll(Sort.by("quotaSize").ascending())
+                .stream()
+                .map(plan -> toAdminPlanResponse(plan, now))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public AdminPlanResponse updatePlan(String planId, AdminUpdatePlanRequest request, String adminName) {
+        if (request == null) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        StoragePlan plan = storagePlanRepo.findById(planId)
+                .orElseThrow(() -> new AppException(ErrorCode.PLAN_NOT_FOUND));
+
+        if (request.getPlanName() != null && !request.getPlanName().isBlank()) {
+            plan.setPlanName(request.getPlanName().trim());
+        }
+        if (request.getQuotaSize() != null) {
+            plan.setQuotaSize(request.getQuotaSize());
+        }
+        if (request.getPrice() != null) {
+            plan.setPrice(request.getPrice());
+        }
+        if (request.getDurationMonths() != null) {
+            plan.setDurationMonths(request.getDurationMonths());
+        }
+
+        StoragePlan savedPlan = storagePlanRepo.save(plan);
+        logService.log(adminName, "ADMIN_ACTION", "UPDATE_PLAN", savedPlan.getId(),
+                "Admin " + adminName + " updated storage plan [" + savedPlan.getPlanName() + "]");
+        return toAdminPlanResponse(savedPlan, LocalDateTime.now());
+    }
+
+    private AdminPlanResponse toAdminPlanResponse(StoragePlan plan, LocalDateTime now) {
+        return AdminPlanResponse.builder()
+                .id(plan.getId())
+                .planName(plan.getPlanName())
+                .quotaSize(plan.getQuotaSize())
+                .price(plan.getPrice())
+                .durationMonths(plan.getDurationMonths())
+                .subscriberCount(userRepo.countActiveSubscribersByQuotaSize(plan.getQuotaSize(), now))
+                .build();
+    }
+
     // =========================================================================
     // 🤖 TRANG 6: THỐNG KÊ CHI TIẾT AI CHATBOT (RAG Semantic Analytics)
     // =========================================================================
@@ -536,10 +641,59 @@ public class AdminService {
     // ⚙️ TRANG 7: CÀI ĐẶT HỆ THỐNG ADMINISTRATIVE
     // =========================================================================
     public SystemSettingsResponse getSystemSettings() {
+        String savedSettings = redisService.get(ADMIN_SETTINGS_KEY);
+        if (savedSettings != null) {
+            try {
+                return objectMapper.readValue(savedSettings, SystemSettingsResponse.class);
+            } catch (JsonProcessingException ignored) {
+                redisService.delete(ADMIN_SETTINGS_KEY);
+            }
+        }
+        return defaultSystemSettings();
+    }
+
+    public SystemSettingsResponse updateSystemSettings(AdminUpdateSettingsRequest request, String adminName) {
+        if (request == null) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        SystemSettingsResponse currentSettings = getSystemSettings();
+        SystemSettingsResponse updatedSettings = SystemSettingsResponse.builder()
+                .applicationName(firstNonBlank(request.getApplicationName(), currentSettings.getApplicationName()))
+                .maintenanceMode(request.getMaintenanceMode() != null ? request.getMaintenanceMode() : currentSettings.isMaintenanceMode())
+                .defaultStorageLimit(request.getDefaultStorageLimit() != null ? request.getDefaultStorageLimit() : currentSettings.getDefaultStorageLimit())
+                .maxFileSizeUpload(request.getMaxFileSizeUpload() != null ? request.getMaxFileSizeUpload() : currentSettings.getMaxFileSizeUpload())
+                .allowedFileTypes(firstNonBlank(request.getAllowedFileTypes(), currentSettings.getAllowedFileTypes()))
+                .otpExpiryMinutes(request.getOtpExpiryMinutes() != null ? request.getOtpExpiryMinutes() : currentSettings.getOtpExpiryMinutes())
+                .sessionTimeoutMinutes(request.getSessionTimeoutMinutes() != null ? request.getSessionTimeoutMinutes() : currentSettings.getSessionTimeoutMinutes())
+                .maxLoginAttempts(request.getMaxLoginAttempts() != null ? request.getMaxLoginAttempts() : currentSettings.getMaxLoginAttempts())
+                .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : currentSettings.isEmailNotificationEnabled())
+                .build();
+        try {
+            redisService.set(ADMIN_SETTINGS_KEY, objectMapper.writeValueAsString(updatedSettings));
+        } catch (JsonProcessingException exception) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        logService.log(adminName, "ADMIN_ACTION", "UPDATE_SETTINGS", "SYSTEM",
+                "Admin " + adminName + " updated system settings");
+        return updatedSettings;
+    }
+
+    private SystemSettingsResponse defaultSystemSettings() {
         return SystemSettingsResponse.builder()
                 .applicationName("AI StudyHub Portal v1.0")
-                .maintenanceMode(false) // Mặc định tắt chế độ bảo trì để cổng public chạy thông suốt
+                .maintenanceMode(false)
+                .defaultStorageLimit(524288000L)
+                .maxFileSizeUpload(10485760L)
+                .allowedFileTypes("pdf,doc,docx,png,jpg,jpeg,txt,mp3,mp4,ppt,pptx")
+                .otpExpiryMinutes(5)
+                .sessionTimeoutMinutes(60)
+                .maxLoginAttempts(5)
+                .emailNotificationEnabled(true)
                 .build();
+    }
+
+    private String firstNonBlank(String value, String fallback) {
+        return value != null && !value.isBlank() ? value.trim() : fallback;
     }
 
     // 🌟 PHƯƠNG THỨC TIỆN ÍCH PHÂN TRANG THỦ CÔNG KHÔNG LỆCH NGOẶC
