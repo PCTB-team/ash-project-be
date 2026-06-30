@@ -684,8 +684,20 @@ public class AuthenService {
     }
 
     private void ensureAccountNonLocked(User user) {
+        if (!user.isAccountNonLocked() && !hasLockMetadata(user)) {
+            user.setAccountNonLocked(true);
+            userRepo.save(user);
+            return;
+        }
+
         if (!user.isAccountNonLocked()) {
             throw new AppException(ErrorCode.ACCOUNT_IS_LOCKED);
         }
+    }
+
+    private boolean hasLockMetadata(User user) {
+        return user.getLockedAt() != null
+                || user.getLockedReason() != null
+                || user.getLockedByAdmin() != null;
     }
 }

@@ -162,7 +162,7 @@ public class AdminService {
                         .build())
                 .collect(Collectors.toList());
 
-        long activeUsers = allUsers.stream().filter(User::isAccountNonLocked).count();
+        long activeUsers = allUsers.stream().filter(user -> !isExplicitlyLocked(user)).count();
         long pendingReports = allUsers.size() - activeUsers;
 
         return DashboardStatsResponse.builder()
@@ -280,10 +280,18 @@ public class AdminService {
 
     private UserResponse toAdminUserResponse(User user) {
         UserResponse response = userMapper.toUserResponse(user);
+        response.setAccountNonLocked(!isExplicitlyLocked(user));
         Long usedStorage = documentRepo.sumFileSizeByOwner(user);
         response.setStorageUsed(usedStorage != null ? usedStorage : 0L);
         response.setDocumentsCount(documentRepo.countActiveByOwner(user));
         return response;
+    }
+
+    private boolean isExplicitlyLocked(User user) {
+        return !user.isAccountNonLocked()
+                && (user.getLockedAt() != null
+                || user.getLockedReason() != null
+                || user.getLockedByAdmin() != null);
     }
 
     @Transactional
