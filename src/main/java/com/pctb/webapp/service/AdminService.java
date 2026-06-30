@@ -44,6 +44,8 @@ public class AdminService {
     ObjectMapper objectMapper;
 
     static String ADMIN_SETTINGS_KEY = "admin:system:settings";
+    static String ADMIN_PLAN_STATUS_PREFIX = "admin:plan:status:";
+    static String ADMIN_PLAN_FEATURES_PREFIX = "admin:plan:features:";
 
     // =========================================================================
     // 📊 TRANG 1: LOGIC DASHBOARD TỔNG QUAN (Đồng bộ Stat Cards, Charts, Hoạt động gần đây)
@@ -245,7 +247,7 @@ public class AdminService {
         }
 
         List<UserResponse> dtoList = filteredUsers.stream()
-                .map(userMapper::toUserResponse)
+                .map(this::toAdminUserResponse)
                 .filter(res -> {
                     if (role != null && !role.isBlank()) {
                         boolean hasMatchingRole = res.getRoles().stream()
@@ -270,7 +272,15 @@ public class AdminService {
     public UserResponse getUserDetailById(String userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return userMapper.toUserResponse(user);
+        return toAdminUserResponse(user);
+    }
+
+    private UserResponse toAdminUserResponse(User user) {
+        UserResponse response = userMapper.toUserResponse(user);
+        Long usedStorage = documentRepo.sumFileSizeByOwner(user);
+        response.setStorageUsed(usedStorage != null ? usedStorage : 0L);
+        response.setDocumentsCount(documentRepo.countActiveByOwner(user));
+        return response;
     }
 
     @Transactional
@@ -497,7 +507,7 @@ public class AdminService {
         }
         return switch (status.trim().toUpperCase()) {
             case "ACTIVE", "UNLOCKED", "ENABLED" -> true;
-            case "BANNED", "LOCKED", "DISABLED" -> false;
+            case "BANNED", "LOCKED", "DISABLED", "INACTIVE" -> false;
             default -> throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
         };
     }
@@ -585,8 +595,9 @@ public class AdminService {
         StoragePlan plan = storagePlanRepo.findById(planId)
                 .orElseThrow(() -> new AppException(ErrorCode.PLAN_NOT_FOUND));
 
-        if (request.getPlanName() != null && !request.getPlanName().isBlank()) {
-            plan.setPlanName(request.getPlanName().trim());
+        String requestedPlanName = firstNonBlank(request.getName(), request.getPlanName());
+        if (requestedPlanName != null && !requestedPlanName.isBlank()) {
+            plan.setPlanName(requestedPlanName.trim());
         }
         if (request.getQuotaSize() != null) {
             plan.setQuotaSize(request.getQuotaSize());
@@ -596,6 +607,12 @@ public class AdminService {
         }
         if (request.getDurationMonths() != null) {
             plan.setDurationMonths(request.getDurationMonths());
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            redisService.set(planStatusKey(planId), normalizePlanStatus(request.getStatus()));
+        }
+        if (request.getFeatures() != null) {
+            savePlanFeatures(planId, request.getFeatures());
         }
 
         StoragePlan savedPlan = storagePlanRepo.save(plan);
@@ -611,8 +628,72 @@ public class AdminService {
                 .quotaSize(plan.getQuotaSize())
                 .price(plan.getPrice())
                 .durationMonths(plan.getDurationMonths())
+                .status(getPlanStatus(plan.getId()))
+                .features(getPlanFeatures(plan))
                 .subscriberCount(userRepo.countActiveSubscribersByQuotaSize(plan.getQuotaSize(), now))
                 .build();
+    }
+
+    private String normalizePlanStatus(String status) {
+        String cleanStatus = status.trim().toUpperCase();
+        if (!List.of("ACTIVE", "INACTIVE", "DISABLED").contains(cleanStatus)) {
+            throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        }
+        return "DISABLED".equals(cleanStatus) ? "INACTIVE" : cleanStatus;
+    }
+
+    private String getPlanStatus(String planId) {
+        String status = redisService.get(planStatusKey(planId));
+        return status != null && !status.isBlank() ? status : "ACTIVE";
+    }
+
+    private List<String> getPlanFeatures(StoragePlan plan) {
+        String savedFeatures = redisService.get(planFeaturesKey(plan.getId()));
+        if (savedFeatures != null) {
+            try {
+                return objectMapper.readValue(
+                        savedFeatures,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+                );
+            } catch (JsonProcessingException ignored) {
+                redisService.delete(planFeaturesKey(plan.getId()));
+            }
+        }
+        return List.of(
+                formatQuota(plan.getQuotaSize()) + " storage",
+                (plan.getDurationMonths() != null ? plan.getDurationMonths() : 1) + " month duration"
+        );
+    }
+
+    private void savePlanFeatures(String planId, List<String> features) {
+        try {
+            redisService.set(planFeaturesKey(planId), objectMapper.writeValueAsString(features));
+        } catch (JsonProcessingException exception) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+    }
+
+    private String formatQuota(Long quotaSize) {
+        if (quotaSize == null) {
+            return "Custom";
+        }
+        long oneGb = 1024L * 1024L * 1024L;
+        if (quotaSize >= oneGb && quotaSize % oneGb == 0) {
+            return (quotaSize / oneGb) + "GB";
+        }
+        long oneMb = 1024L * 1024L;
+        if (quotaSize >= oneMb && quotaSize % oneMb == 0) {
+            return (quotaSize / oneMb) + "MB";
+        }
+        return quotaSize + " bytes";
+    }
+
+    private String planStatusKey(String planId) {
+        return ADMIN_PLAN_STATUS_PREFIX + planId;
+    }
+
+    private String planFeaturesKey(String planId) {
+        return ADMIN_PLAN_FEATURES_PREFIX + planId;
     }
 
     // =========================================================================
@@ -667,6 +748,8 @@ public class AdminService {
                 .sessionTimeoutMinutes(request.getSessionTimeoutMinutes() != null ? request.getSessionTimeoutMinutes() : currentSettings.getSessionTimeoutMinutes())
                 .maxLoginAttempts(request.getMaxLoginAttempts() != null ? request.getMaxLoginAttempts() : currentSettings.getMaxLoginAttempts())
                 .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : currentSettings.isEmailNotificationEnabled())
+                .allowRegistration(request.getAllowRegistration() != null ? request.getAllowRegistration() : currentSettings.isAllowRegistration())
+                .defaultUserStorage(request.getDefaultUserStorage() != null ? request.getDefaultUserStorage() : currentSettings.getDefaultUserStorage())
                 .build();
         try {
             redisService.set(ADMIN_SETTINGS_KEY, objectMapper.writeValueAsString(updatedSettings));
@@ -689,6 +772,8 @@ public class AdminService {
                 .sessionTimeoutMinutes(60)
                 .maxLoginAttempts(5)
                 .emailNotificationEnabled(true)
+                .allowRegistration(true)
+                .defaultUserStorage(524288000L)
                 .build();
     }
 

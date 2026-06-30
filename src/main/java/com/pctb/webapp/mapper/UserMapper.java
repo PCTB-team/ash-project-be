@@ -10,6 +10,8 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {
+    @Mapping(target = "storageMax", source = "storageQuota")
+    @Mapping(target = "documentsCount", ignore = true)
     UserResponse toUserResponse(User user);
 
     // Chuyển entity User sang profile response để không trả password ra ngoài.

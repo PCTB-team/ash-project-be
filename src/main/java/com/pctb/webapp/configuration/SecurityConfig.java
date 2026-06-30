@@ -69,6 +69,8 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/ws", "/ws/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/settings/intro").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/settings/intro").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/groups/invite/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/groups/**").hasAnyRole("USER", "ADMIN")

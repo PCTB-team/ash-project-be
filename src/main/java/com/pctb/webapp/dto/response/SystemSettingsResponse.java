@@ -18,4 +18,6 @@ public class SystemSettingsResponse {
     Integer sessionTimeoutMinutes;
     Integer maxLoginAttempts;
     boolean emailNotificationEnabled;
+    boolean allowRegistration;
+    Long defaultUserStorage;
 }
