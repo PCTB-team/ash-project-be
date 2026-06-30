@@ -2,7 +2,9 @@ package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.AiChatRequest;
 import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
+import com.pctb.webapp.dto.response.AiChatConversationPageResponse;
 import com.pctb.webapp.dto.response.AiChatHistoryPageResponse;
+import com.pctb.webapp.dto.response.AiChatMessageListResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
 import com.pctb.webapp.dto.response.AiChatResponse;
 import com.pctb.webapp.dto.response.ApiResponse;
@@ -18,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,6 +57,31 @@ public class AiChatController {
         return ApiResponse.<AiDocumentChatResponse>builder()
                 .message("Chat with knowledge successfully")
                 .result(aiChatService.chatWithKnowledge(request, authentication))
+                .build();
+    }
+
+    @Operation(summary = "Get AI knowledge chat conversations")
+    @GetMapping("/knowledge/conversations")
+    public ApiResponse<AiChatConversationPageResponse> getKnowledgeChatConversations(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "30") int size,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<AiChatConversationPageResponse>builder()
+                .message("Get AI knowledge chat conversations successfully")
+                .result(aiChatService.getKnowledgeChatConversations(page, size, authentication))
+                .build();
+    }
+
+    @Operation(summary = "Get AI knowledge chat conversation messages")
+    @GetMapping("/knowledge/conversations/{conversationId}/messages")
+    public ApiResponse<AiChatMessageListResponse> getKnowledgeChatMessages(
+            @PathVariable String conversationId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<AiChatMessageListResponse>builder()
+                .message("Get AI knowledge chat messages successfully")
+                .result(aiChatService.getKnowledgeChatMessages(conversationId, authentication))
                 .build();
     }
 

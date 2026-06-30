@@ -2,17 +2,27 @@ package com.pctb.webapp.service;
 
 import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
 import com.pctb.webapp.dto.response.AiAnswerSource;
+import com.pctb.webapp.dto.response.AiChatConversationPageResponse;
+import com.pctb.webapp.dto.response.AiChatConversationResponse;
 import com.pctb.webapp.dto.response.AiChatHistoryPageResponse;
 import com.pctb.webapp.dto.response.AiChatHistoryResponse;
+import com.pctb.webapp.dto.response.AiChatMessageListResponse;
+import com.pctb.webapp.dto.response.AiChatMessageResponse;
 import com.pctb.webapp.dto.response.AiChatSourceResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
+import com.pctb.webapp.entity.AiChatConversation;
+import com.pctb.webapp.entity.AiChatConversationDocument;
 import com.pctb.webapp.entity.AiChatHistory;
+import com.pctb.webapp.entity.AiChatMessage;
 import com.pctb.webapp.entity.Document;
 import com.pctb.webapp.entity.Folder;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.repository.AiChatConversationRepo;
+import com.pctb.webapp.repository.AiChatConversationDocumentRepo;
 import com.pctb.webapp.repository.AiChatHistoryRepo;
+import com.pctb.webapp.repository.AiChatMessageRepo;
 import com.pctb.webapp.repository.DocumentRepo;
 import com.pctb.webapp.repository.FolderRepo;
 import com.pctb.webapp.repository.UserRepo;
@@ -50,12 +60,12 @@ import java.util.stream.Collectors;
 
 @Service
 public class AiChatService {
-    private static final String SYSTEM_INSTRUCTION = "Ban la tro ly AI trong he thong quan ly tai lieu. Tra loi ngan gon, ro rang, bang tieng Viet.";
-    private static final String KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE = "Toi khong tim thay thong tin lien quan trong cac tai lieu hien co.";
+    private static final String SYSTEM_INSTRUCTION = "Bạn là trợ lý AI trong hệ thống quản lý tài liệu. Trả lời ngắn gọn, rõ ràng, bằng tiếng Việt.";
+    private static final String KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE = "Tôi không tìm thấy thông tin liên quan trong các tài liệu hiện có.";
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final int GEMINI_MAX_RETRIES = 3;
-    private static final String AI_BUSY_MESSAGE = "AI hien dang qua tai, vui long thu lai sau.";
-    private static final String AI_UNAVAILABLE_MESSAGE = "AI service tam thoi khong kha dung.";
+    private static final String AI_BUSY_MESSAGE = "AI hiện đang quá tải,Vui lòng thử lại sau";
+    private static final String AI_UNAVAILABLE_MESSAGE = "AI service tạm thời không khả dụng.";
 
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
@@ -64,6 +74,9 @@ public class AiChatService {
     private final FolderRepo folderRepo;
     private final QdrantService qdrantService;
     private final AiChatHistoryRepo aiChatHistoryRepo;
+    private final AiChatConversationRepo aiChatConversationRepo;
+    private final AiChatConversationDocumentRepo aiChatConversationDocumentRepo;
+    private final AiChatMessageRepo aiChatMessageRepo;
     private final UserRepo userRepo;
 
     @Value("${gemini.api-key}")
@@ -81,6 +94,9 @@ public class AiChatService {
             FolderRepo folderRepo,
             QdrantService qdrantService,
             AiChatHistoryRepo aiChatHistoryRepo,
+            AiChatConversationRepo aiChatConversationRepo,
+            AiChatConversationDocumentRepo aiChatConversationDocumentRepo,
+            AiChatMessageRepo aiChatMessageRepo,
             UserRepo userRepo
     ) {
         this.documentTextExtractorService = documentTextExtractorService;
@@ -88,6 +104,9 @@ public class AiChatService {
         this.folderRepo = folderRepo;
         this.qdrantService = qdrantService;
         this.aiChatHistoryRepo = aiChatHistoryRepo;
+        this.aiChatConversationRepo = aiChatConversationRepo;
+        this.aiChatConversationDocumentRepo = aiChatConversationDocumentRepo;
+        this.aiChatMessageRepo = aiChatMessageRepo;
         this.userRepo = userRepo;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(15));
@@ -114,21 +133,23 @@ public class AiChatService {
         // Lấy user hiện tại để khóa quyền truy cập và retrieval theo owner.
         User currentUser = getCurrentUser(authentication);
         String userId = currentUser.getId();
-        Document inferredDocument = resolveDocumentFromMessage(request.getMessage(), userId);
-        Folder inferredFolder = resolveFolderFromMessage(request.getMessage(), userId);
+        AiChatConversation conversation = resolveConversation(request.getConversationId(), userId);
+        AiKnowledgeChatRequest effectiveRequest = buildEffectiveKnowledgeRequest(request, conversation);
+        Document inferredDocument = resolveDocumentFromMessage(effectiveRequest.getMessage(), userId);
+        Folder inferredFolder = resolveFolderFromMessage(effectiveRequest.getMessage(), userId);
 
         // Xác định phạm vi chat: một tài liệu, một folder hoặc toàn bộ tài liệu.
-        AiKnowledgeScope scope = resolveKnowledgeScope(request, inferredDocument, inferredFolder);
+        AiKnowledgeScope scope = resolveKnowledgeScope(effectiveRequest, inferredDocument, inferredFolder);
 
         // Kiểm tra quyền truy cập theo scope trước khi search dữ liệu.
         switch (scope) {
             case DOCUMENT -> {
-                if (hasText(request.getDocumentId())) {
-                    validateDocumentScopeAccess(request.getDocumentId(), userId);
+                if (hasText(effectiveRequest.getDocumentId())) {
+                    validateDocumentScopeAccess(effectiveRequest.getDocumentId(), userId);
                 }
             }
             case FOLDER -> validateFolderScopeAccess(
-                    hasText(request.getFolderId()) ? request.getFolderId() : inferredFolder.getId(),
+                    hasText(effectiveRequest.getFolderId()) ? effectiveRequest.getFolderId() : inferredFolder.getId(),
                     userId
             );
             case ALL_DOCUMENTS -> {
@@ -136,59 +157,106 @@ public class AiChatService {
         }
 
         // Chuẩn hóa điều kiện search thành một object filter nội bộ.
-        AiKnowledgeFilter filter = buildKnowledgeFilter(request, userId, scope, inferredDocument, inferredFolder);
+        AiKnowledgeFilter filter = buildKnowledgeFilter(effectiveRequest, userId, scope, inferredDocument, inferredFolder);
 
         // Retrieve cac chunk lien quan tu lop vector search.
         List<AiRetrievedChunk> retrievedChunks = retrieveKnowledgeChunks(
-                request.getMessage(),
-                filter
+                effectiveRequest.getMessage(),
+                filter,
+                conversation,
+                scope
         );
 
-        if (hasRelevantContext(retrievedChunks, scope)) {
-            String answer = generateDocumentGroundedAnswer(request.getMessage(), retrievedChunks);
+        AiDocumentChatResponse response;
+        if (hasRelevantContext(retrievedChunks, scope)
+                || hasRelevantConversationContext(retrievedChunks, conversation, scope)) {
+            String answer = generateDocumentGroundedAnswer(effectiveRequest.getMessage(), retrievedChunks);
             if (isAiTemporaryFailure(answer)) {
                 answer = buildFallbackAnswerFromSources(retrievedChunks);
             }
 
-            AiDocumentChatResponse response = AiDocumentChatResponse.builder()
+            response = AiDocumentChatResponse.builder()
                     .answer(answer)
                     .answerSource(AiAnswerSource.DOCUMENT)
                     .sources(toChatSources(retrievedChunks))
                     .build();
-
-            AiChatHistory history = saveKnowledgeChatHistory(
-                    currentUser,
-                    resolveHistoryDocumentId(request, inferredDocument),
-                    resolveHistoryFolderId(request, inferredFolder),
-                    request.getMessage(),
-                    response.getAnswer(),
-                    response.getAnswerSource()
-            );
-            response.setHistoryId(history.getId());
-
-            return response;
+        } else {
+            response = AiDocumentChatResponse.builder()
+                    .answer(KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE)
+                    .answerSource(AiAnswerSource.DOCUMENT)
+                    .sources(List.of())
+                    .build();
         }
 
-        AiDocumentChatResponse response = AiDocumentChatResponse.builder()
-                .answer(KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE)
-                .answerSource(AiAnswerSource.DOCUMENT)
-                .sources(List.of())
-                .build();
+        if (conversation == null) {
+            conversation = createKnowledgeConversation(
+                    currentUser,
+                    resolveHistoryDocumentId(effectiveRequest, inferredDocument),
+                    resolveHistoryFolderId(effectiveRequest, inferredFolder),
+                    effectiveRequest.getMessage()
+            );
+        }
 
-        AiChatHistory history = saveKnowledgeChatHistory(
-                currentUser,
-                resolveHistoryDocumentId(request, inferredDocument),
-                resolveHistoryFolderId(request, inferredFolder),
-                request.getMessage(),
-                response.getAnswer(),
-                response.getAnswerSource()
+        addConversationDocumentContext(conversation, inferredDocument);
+        addConversationDocumentContext(conversation, response.getSources());
+
+        AiChatMessage assistantMessage = saveConversationMessages(
+                conversation,
+                effectiveRequest.getMessage(),
+                response
         );
-        response.setHistoryId(history.getId());
+
+        response.setConversationId(conversation.getId());
+        response.setHistoryId(assistantMessage.getId());
 
         return response;
     }
 
     // Suy ra scope chat từ request đầu vào.
+    @Transactional(readOnly = true)
+    public AiChatConversationPageResponse getKnowledgeChatConversations(
+            int page,
+            int size,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        Pageable pageable = PageRequest.of(normalizePage(page), normalizePageSize(size));
+        Page<AiChatConversation> conversationPage = aiChatConversationRepo
+                .findByUserIdOrderByUpdatedAtDesc(currentUser.getId(), pageable);
+
+        return AiChatConversationPageResponse.builder()
+                .items(conversationPage.getContent().stream()
+                        .map(this::buildConversationResponse)
+                        .toList())
+                .page(conversationPage.getNumber())
+                .size(conversationPage.getSize())
+                .totalElements(conversationPage.getTotalElements())
+                .totalPages(conversationPage.getTotalPages())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public AiChatMessageListResponse getKnowledgeChatMessages(
+            String conversationId,
+            JwtAuthenticationToken authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        AiChatConversation conversation = aiChatConversationRepo
+                .findByIdAndUserId(conversationId, currentUser.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.REQUEST_PARAMETER_INVALID));
+
+        return AiChatMessageListResponse.builder()
+                .conversationId(conversation.getId())
+                .title(conversation.getTitle())
+                .documentId(conversation.getDocumentId())
+                .folderId(conversation.getFolderId())
+                .messages(aiChatMessageRepo.findByConversationIdOrderByCreatedAtAsc(conversation.getId())
+                        .stream()
+                        .map(this::buildMessageResponse)
+                        .toList())
+                .build();
+    }
+
     @Transactional(readOnly = true)
     public AiChatHistoryPageResponse getKnowledgeChatHistory(
             int page,
@@ -227,6 +295,197 @@ public class AiChatService {
                 .answerSource(answerSource == null ? null : answerSource.name())
                 .createdAt(LocalDateTime.now())
                 .build());
+    }
+
+    private AiChatConversation resolveConversation(String conversationId, String userId) {
+        if (!hasText(conversationId)) {
+            return null;
+        }
+
+        return aiChatConversationRepo.findByIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.REQUEST_PARAMETER_INVALID));
+    }
+
+    private AiKnowledgeChatRequest buildEffectiveKnowledgeRequest(
+            AiKnowledgeChatRequest request,
+            AiChatConversation conversation
+    ) {
+        if (conversation == null) {
+            return request;
+        }
+
+        return AiKnowledgeChatRequest.builder()
+                .conversationId(conversation.getId())
+                .folderId(conversation.getFolderId())
+                .message(request.getMessage())
+                .build();
+    }
+
+    private AiChatConversation createKnowledgeConversation(
+            User user,
+            String documentId,
+            String folderId,
+            String firstMessage
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        return aiChatConversationRepo.save(AiChatConversation.builder()
+                .user(user)
+                .title(buildConversationTitle(firstMessage))
+                .documentId(documentId)
+                .folderId(folderId)
+                .createdAt(now)
+                .updatedAt(now)
+                .build());
+    }
+
+    private void addConversationDocumentContext(
+            AiChatConversation conversation,
+            Document document
+    ) {
+        if (conversation == null || document == null) {
+            return;
+        }
+
+        if (aiChatConversationDocumentRepo.existsByConversationIdAndDocumentId(
+                conversation.getId(),
+                document.getId()
+        )) {
+            return;
+        }
+
+        aiChatConversationDocumentRepo.save(AiChatConversationDocument.builder()
+                .conversation(conversation)
+                .document(document)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    private void addConversationDocumentContext(
+            AiChatConversation conversation,
+            List<AiChatSourceResponse> sources
+    ) {
+        if (conversation == null || sources == null || sources.isEmpty()) {
+            return;
+        }
+
+        for (AiChatSourceResponse source : sources) {
+            if (source == null || !hasText(source.getDocumentId())) {
+                continue;
+            }
+
+            Document document = documentRepo.findById(source.getDocumentId()).orElse(null);
+            addConversationDocumentContext(conversation, document);
+        }
+    }
+
+    private AiChatMessage saveConversationMessages(
+            AiChatConversation conversation,
+            String userMessage,
+            AiDocumentChatResponse response
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        aiChatMessageRepo.save(AiChatMessage.builder()
+                .conversation(conversation)
+                .role("USER")
+                .content(userMessage)
+                .createdAt(now)
+                .build());
+
+        AiChatMessage assistantMessage = aiChatMessageRepo.save(AiChatMessage.builder()
+                .conversation(conversation)
+                .role("ASSISTANT")
+                .content(response.getAnswer())
+                .answerSource(response.getAnswerSource() == null ? null : response.getAnswerSource().name())
+                .sourcesJson(toSourcesJson(response.getSources()))
+                .createdAt(now.plusNanos(1))
+                .build());
+
+        conversation.setUpdatedAt(now);
+        aiChatConversationRepo.save(conversation);
+
+        return assistantMessage;
+    }
+
+    private String buildConversationTitle(String firstMessage) {
+        if (!hasText(firstMessage)) {
+            return "New chat";
+        }
+
+        String title = firstMessage.trim().replaceAll("\\s+", " ");
+        if (title.length() <= 80) {
+            return title;
+        }
+
+        return title.substring(0, 80);
+    }
+
+    private AiChatConversationResponse buildConversationResponse(AiChatConversation conversation) {
+        return AiChatConversationResponse.builder()
+                .conversationId(conversation.getId())
+                .title(conversation.getTitle())
+                .documentId(conversation.getDocumentId())
+                .folderId(conversation.getFolderId())
+                .createdAt(conversation.getCreatedAt() == null ? null : conversation.getCreatedAt().toString())
+                .updatedAt(conversation.getUpdatedAt() == null ? null : conversation.getUpdatedAt().toString())
+                .build();
+    }
+
+    private AiChatMessageResponse buildMessageResponse(AiChatMessage message) {
+        return AiChatMessageResponse.builder()
+                .messageId(message.getId())
+                .role(message.getRole())
+                .content(message.getContent())
+                .answerSource(message.getAnswerSource())
+                .sources(parseSourcesJson(message.getSourcesJson()))
+                .createdAt(message.getCreatedAt() == null ? null : message.getCreatedAt().toString())
+                .build();
+    }
+
+    private String toSourcesJson(List<AiChatSourceResponse> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return null;
+        }
+
+        try {
+            List<Map<String, Object>> sourceItems = new java.util.ArrayList<>();
+            for (AiChatSourceResponse source : sources) {
+                Map<String, Object> sourceItem = new LinkedHashMap<>();
+                sourceItem.put("documentId", source.getDocumentId());
+                sourceItem.put("fileName", source.getFileName());
+                sourceItem.put("chunkIndex", source.getChunkIndex());
+                sourceItem.put("excerpt", source.getExcerpt());
+                sourceItem.put("score", source.getScore());
+                sourceItems.add(sourceItem);
+            }
+
+            return jsonMapper.writeValueAsString(sourceItems);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to serialize AI chat sources", exception);
+            return null;
+        }
+    }
+
+    private List<AiChatSourceResponse> parseSourcesJson(String sourcesJson) {
+        if (!hasText(sourcesJson)) {
+            return List.of();
+        }
+
+        JsonNode sourceNodes = jsonMapper.readTree(sourcesJson);
+        List<AiChatSourceResponse> sources = new java.util.ArrayList<>();
+
+        for (JsonNode sourceNode : sourceNodes) {
+            sources.add(AiChatSourceResponse.builder()
+                    .documentId(sourceNode.path("documentId").asText(null))
+                    .fileName(sourceNode.path("fileName").asText(null))
+                    .chunkIndex(sourceNode.path("chunkIndex").isMissingNode() ? null : sourceNode.path("chunkIndex").asInt())
+                    .excerpt(sourceNode.path("excerpt").asText(null))
+                    .score(sourceNode.path("score").isMissingNode() ? null : sourceNode.path("score").asDouble())
+                    .build());
+        }
+
+        return sources;
     }
 
     private AiChatHistoryResponse buildChatHistoryResponse(AiChatHistory history) {
@@ -324,13 +583,85 @@ public class AiChatService {
     // Retrieve các chunk liên quan theo câu hỏi và phạm vi dữ liệu đã chuẩn hóa.
     private List<AiRetrievedChunk> retrieveKnowledgeChunks(
             String query,
-            AiKnowledgeFilter filter
+            AiKnowledgeFilter filter,
+            AiChatConversation conversation,
+            AiKnowledgeScope scope
     ) {
         if (filter.getFolderId() != null && !filter.getFolderId().isBlank()) {
             return retrieveKnowledgeChunksForFolderScope(query, filter);
         }
 
+        if (scope == AiKnowledgeScope.ALL_DOCUMENTS && conversation != null) {
+            List<AiRetrievedChunk> conversationChunks = retrieveKnowledgeChunksForConversationContext(query, filter, conversation);
+            if (hasConversationDocumentContext(conversation)) {
+                return conversationChunks;
+            }
+        }
+
         return qdrantService.searchKnowledgeChunks(query, filter);
+    }
+
+    private boolean hasConversationDocumentContext(AiChatConversation conversation) {
+        return conversation != null
+                && !aiChatConversationDocumentRepo.findByConversationId(conversation.getId()).isEmpty();
+    }
+
+    private boolean hasRelevantConversationContext(
+            List<AiRetrievedChunk> retrievedChunks,
+            AiChatConversation conversation,
+            AiKnowledgeScope scope
+    ) {
+        return scope == AiKnowledgeScope.ALL_DOCUMENTS
+                && conversation != null
+                && hasConversationDocumentContext(conversation)
+                && retrievedChunks != null
+                && !retrievedChunks.isEmpty();
+    }
+
+    private List<AiRetrievedChunk> retrieveKnowledgeChunksForConversationContext(
+            String query,
+            AiKnowledgeFilter filter,
+            AiChatConversation conversation
+    ) {
+        List<AiChatConversationDocument> contextDocuments = aiChatConversationDocumentRepo
+                .findByConversationId(conversation.getId());
+        if (contextDocuments.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, AiRetrievedChunk> bestChunkByDocumentAndIndex = new LinkedHashMap<>();
+
+        for (AiChatConversationDocument contextDocument : contextDocuments) {
+            Document document = contextDocument.getDocument();
+            if (document == null || Boolean.TRUE.equals(document.getDeleted())) {
+                continue;
+            }
+
+            AiKnowledgeFilter documentFilter = AiKnowledgeFilter.builder()
+                    .ownerId(filter.getOwnerId())
+                    .documentId(document.getId())
+                    .build();
+
+            for (AiRetrievedChunk chunk : qdrantService.searchKnowledgeChunks(query, documentFilter)) {
+                String chunkKey = chunk.getDocumentId() + ":" + chunk.getChunkIndex();
+                AiRetrievedChunk existingChunk = bestChunkByDocumentAndIndex.get(chunkKey);
+
+                if (existingChunk == null
+                        || (chunk.getScore() != null
+                        && (existingChunk.getScore() == null || chunk.getScore() > existingChunk.getScore()))) {
+                    bestChunkByDocumentAndIndex.put(chunkKey, chunk);
+                }
+            }
+        }
+
+        return bestChunkByDocumentAndIndex.values().stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(
+                        AiRetrievedChunk::getScore,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .limit(5)
+                .toList();
     }
 
     private List<AiRetrievedChunk> retrieveKnowledgeChunksForFolderScope(
