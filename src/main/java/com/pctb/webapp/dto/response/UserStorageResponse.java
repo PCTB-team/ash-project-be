@@ -19,4 +19,10 @@ public class UserStorageResponse {
     long maxStorage;
     long remainingStorage;
     double usagePercent;
+    String planCode;
+    String planName;
+    boolean planActive;
+    String storageExpiredAt;
+    long daysUntilExpired;
+    boolean canUpgrade;
 }
