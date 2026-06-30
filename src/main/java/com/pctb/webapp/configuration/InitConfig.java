@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Slf4j
@@ -62,6 +63,26 @@ public class InitConfig {
             }
 
             if (userRepo.existsByUsername(adminUsername) || userRepo.existsByEmail(adminEmail)) {
+                userRepo.findByEmailOrUsername(adminEmail, adminUsername).ifPresent(existingAdmin -> {
+                    Set<Role> roles = existingAdmin.getRoles() != null
+                            ? new HashSet<>(existingAdmin.getRoles())
+                            : new HashSet<>();
+                    roles.add(adminRole);
+                    existingAdmin.setRoles(roles);
+                    existingAdmin.setVerified(true);
+                    existingAdmin.setAccountNonLocked(true);
+                    existingAdmin.setLockedAt(null);
+                    existingAdmin.setLockedReason(null);
+                    existingAdmin.setLockedByAdmin(null);
+                    if (existingAdmin.getStorageQuota() == null) {
+                        existingAdmin.setStorageQuota(5368709120L);
+                    }
+                    if (existingAdmin.getStorageUsed() == null) {
+                        existingAdmin.setStorageUsed(0L);
+                    }
+                    userRepo.save(existingAdmin);
+                    log.info("Existing admin account repaired: {}", existingAdmin.getEmail());
+                });
                 return;
             }
 
@@ -71,6 +92,7 @@ public class InitConfig {
                     .password(passwordEncoder.encode(adminPassword))
                     .fullname(adminFullname)
                     .verified(true)
+                    .accountNonLocked(true)
                     .storageQuota(5368709120L) // Đồng bộ tránh lỗi null bộ nhớ cho Admin
                     .storageUsed(0L)
                     .roles(Set.of(adminRole))

@@ -406,6 +406,9 @@ public class AuthenService {
             // Gắn scope cho user
             String scope = user.getRoles().stream()
                     .map(Role::getName)
+                    .filter(Objects::nonNull)
+                    .map(role -> role.startsWith("ROLE_") ? role.substring("ROLE_".length()) : role)
+                    .map(role -> role.toUpperCase(Locale.ROOT))
                     .collect(Collectors.joining(" "));
             // Tạo jwt claim,tức là nội dung
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
