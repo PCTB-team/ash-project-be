@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,5 +20,7 @@ public class AdminPlanResponse {
     Long quotaSize;
     Long price;
     Integer durationMonths;
+    String status;
+    List<String> features;
     long subscriberCount;
 }

@@ -13,4 +13,6 @@ public class AdminUpdateSettingsRequest {
     Integer sessionTimeoutMinutes;
     Integer maxLoginAttempts;
     Boolean emailNotificationEnabled;
+    Boolean allowRegistration;
+    Long defaultUserStorage;
 }
