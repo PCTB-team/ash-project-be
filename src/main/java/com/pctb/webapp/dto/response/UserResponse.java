@@ -8,7 +8,6 @@ import lombok.Setter;
 
 import lombok.Builder; // <-- THÊM DÒNG NÀY
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -30,4 +29,9 @@ public class UserResponse {
      LocalDateTime lockedAt;
      String lockedReason;
      String lockedByAdmin;
+
+     Long storageUsed;
+     Long storageMax;
+     Long documentsCount;
+     LocalDateTime createdAt;
 }

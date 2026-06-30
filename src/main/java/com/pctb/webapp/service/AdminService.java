@@ -247,7 +247,7 @@ public class AdminService {
         }
 
         List<UserResponse> dtoList = filteredUsers.stream()
-                .map(userMapper::toUserResponse)
+                .map(this::toAdminUserResponse)
                 .filter(res -> {
                     if (role != null && !role.isBlank()) {
                         boolean hasMatchingRole = res.getRoles().stream()
@@ -272,7 +272,15 @@ public class AdminService {
     public UserResponse getUserDetailById(String userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return userMapper.toUserResponse(user);
+        return toAdminUserResponse(user);
+    }
+
+    private UserResponse toAdminUserResponse(User user) {
+        UserResponse response = userMapper.toUserResponse(user);
+        Long usedStorage = documentRepo.sumFileSizeByOwner(user);
+        response.setStorageUsed(usedStorage != null ? usedStorage : 0L);
+        response.setDocumentsCount(documentRepo.countActiveByOwner(user));
+        return response;
     }
 
     @Transactional
