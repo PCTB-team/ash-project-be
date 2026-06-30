@@ -37,7 +37,10 @@ public class LockedAccountFilter extends OncePerRequestFilter {
                 && authentication.isAuthenticated()) {
             String userId = jwtAuthenticationToken.getToken().getSubject();
             boolean locked = userId != null && userRepo.findById(userId)
-                    .map(user -> !user.isAccountNonLocked())
+                    .map(user -> !user.isAccountNonLocked()
+                            && (user.getLockedAt() != null
+                            || user.getLockedReason() != null
+                            || user.getLockedByAdmin() != null))
                     .orElse(false);
 
             if (locked) {

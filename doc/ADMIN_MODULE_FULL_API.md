@@ -28,6 +28,47 @@ result.number
 result.size
 ```
 
+## FE Implementation Checklist
+
+FE cần triển khai các màn Admin theo các nhóm sau:
+
+| Module | FE cần làm |
+| --- | --- |
+| Dashboard | Gọi dashboard stats, render stat cards, storage chart, file type chart, user/revenue trend, recent activity |
+| Audit Logs | Bảng logs có filter `ADMIN_ACTION`, `USER_ACTION`, `DOCUMENT_LOG`, phân trang |
+| Users | Bảng user có search, role filter, status filter, lock/unlock, delete, change role, xem storage, số tài liệu, ngày tạo |
+| Manual Storage Reconciliation | Trong user detail/table action, thêm modal chọn gói storage để admin cấp lại gói khi user đã thanh toán nhưng webhook lỗi |
+| Documents | Bảng document có search, filter loại file, soft delete document, stat cards |
+| Groups | Bảng group, detail members, update status, delete group, group stats |
+| Payments | Bảng payment transaction có filter status, phân trang |
+| Revenue | Chart doanh thu theo giờ/ngày/tháng/năm, ưu tiên thêm tab/thanh chọn `HOUR`, `DAY`, `MONTH`, `YEAR` |
+| Plans | Danh sách gói storage, update plan metadata, dùng list plan cho manual storage reconciliation |
+| AI Stats | Stat cards và chart usage theo ngày trong tuần |
+| Settings | Form settings, load current settings, submit update |
+| Error Handling | Đọc `code` và `message`, không chỉ dựa vào HTTP status |
+
+Frontend route gợi ý:
+
+| Page | Suggested route |
+| --- | --- |
+| Dashboard | `/admin/dashboard` |
+| Logs | `/admin/logs` |
+| Users | `/admin/users` |
+| Documents | `/admin/documents` |
+| Groups | `/admin/groups` |
+| Payments/Revenue/Plans | `/admin/payments` |
+| AI Stats | `/admin/ai` |
+| Settings | `/admin/settings` |
+
+Common FE rules:
+
+- Luôn gửi `Authorization: Bearer <accessToken>`.
+- Với API phân trang, giữ state `page`, `size`, `totalElements`, `totalPages`.
+- Với các thao tác thay đổi dữ liệu như lock/unlock/delete/update plan/set storage plan, sau khi thành công cần refetch list hoặc update row local.
+- Date-time từ BE là ISO string, FE format theo UI.
+- Dung lượng là bytes, FE tự format sang MB/GB.
+- Revenue amount là VND, FE format tiền Việt.
+
 ## 1. Dashboard
 
 ### Get dashboard statistics
@@ -44,6 +85,15 @@ Count notes:
 - `activeUsers`: accounts where `accountNonLocked = true`.
 - `pendingReports`: locked accounts where `accountNonLocked = false`.
 - `activeUsersRightNow`: distinct users with login history in the latest activity window; no fake fallback value is returned.
+
+FE cần làm:
+
+- Render stat cards: tổng user, user active, user bị khóa, tổng document, tổng group, tổng doanh thu, doanh thu tháng này.
+- Với `totalUsers`, không cộng `activeUsers + pendingReports` nếu đã dùng `totalUsers`; field này đã đếm tất cả account đúng 1 lần.
+- Render chart file type từ `fileTypeDistribution`.
+- Render chart user growth từ `monthlyUserGrowth`.
+- Render revenue trend từ `monthlyRevenueTrend` hoặc dùng API revenue riêng nếu cần chart chính xác hơn.
+- Render recent activity table/list từ `recentActivities`.
 
 Response `result`:
 
@@ -126,6 +176,13 @@ Response `result.content[]`:
 }
 ```
 
+FE cần làm:
+
+- Có tab/select filter: `ALL`, `ADMIN_ACTION`, `USER_ACTION`, `DOCUMENT_LOG`.
+- Khi đổi filter, reset `page=0`.
+- Hiển thị actor, action, targetId, details, createdAt.
+- Dùng `details` làm nội dung chính vì đây là message audit dễ đọc nhất.
+
 ## 3. User Management
 
 ### Get users
@@ -186,6 +243,19 @@ Lock behavior:
 - Locked users cannot refresh token.
 - Existing access tokens from locked users are blocked by backend security filter and return `ACCOUNT_IS_LOCKED`.
 - System automatically locks inactive non-admin accounts after `app.admin.inactive-lock-days` days. Default is `60` days.
+
+FE cần làm:
+
+- Bảng user cần hiển thị: fullname/username, email, roles, trạng thái, storage progress, documentsCount, createdAt.
+- Storage progress tính bằng `storageUsed / storageMax * 100`; nếu `storageMax <= 0`, hiển thị 0%.
+- Status UI:
+  - `accountNonLocked=true`: Active.
+  - `accountNonLocked=false`: Locked/Banned.
+- Filter status gửi `ACTIVE` hoặc `BANNED`.
+- Lock action phải mở modal nhập `reason`.
+- Unlock action nên confirm trước khi gọi API.
+- Delete user là hard delete, cần confirm rõ.
+- Khi API trả `ACCOUNT_IS_LOCKED` ở phía user session, FE user app nên logout hoặc đưa về màn login với message "Tài khoản đã bị khóa".
 
 ### Get user detail
 
@@ -307,6 +377,20 @@ Errors:
 | User not found | `USER_NOT_FOUND` |
 | Plan not found | `PLAN_NOT_FOUND` |
 
+FE cần làm cho manual storage reconciliation:
+
+- Thêm action trong User table/detail: `Set storage plan` hoặc `Grant plan`.
+- Khi bấm action, mở modal:
+  - Select plan từ `GET /admin/plans`.
+  - Textarea reason, ví dụ: "PayOS webhook missed, bank transfer confirmed".
+  - Submit gọi `PUT /admin/users/{userId}/storage-plan`.
+- Sau khi thành công:
+  - Đóng modal.
+  - Refetch user list/detail.
+  - Có thể show toast: "Đã cập nhật gói dung lượng cho user".
+- Chỉ dùng chức năng này cho case admin đã đối soát được user đã thanh toán nhưng chưa được cộng quota.
+- Không dùng API này để ghi nhận doanh thu; doanh thu vẫn lấy từ transaction `SUCCESS`.
+
 ## 4. Document Management
 
 ### Get documents
@@ -378,6 +462,14 @@ Response `result`:
   "topUploaderFileCount": 12
 }
 ```
+
+FE cần làm:
+
+- Bảng document cần search `keyword` và filter `fileType`.
+- File type filter gợi ý: `ALL`, `DOCUMENT`, `IMAGE`, `AUDIO`, `VIDEO`.
+- Hiển thị `fileSize` dưới dạng KB/MB/GB.
+- Soft delete document cần confirm.
+- Sau khi delete document thành công, refetch list và stats.
 
 ## 5. Study Group Management
 
@@ -489,6 +581,16 @@ Purpose: Permanently delete a group and its dependent messages/files/members.
 
 Response `result`: `GROUP_DELETED`
 
+FE cần làm:
+
+- Group list không cần render members vì `members=null`; khi cần members gọi `GET /admin/groups/{groupId}`.
+- Detail modal/page hiển thị members, role, canUpload, canChat, joinedAt.
+- Update group status dùng select/toggle:
+  - Active gửi `ACTIVE`.
+  - Disable/ban gửi `BANNED` hoặc `DISABLED`.
+- Delete group là hard delete, cần confirm rõ.
+- Sau khi delete/update status, refetch list.
+
 ## 6. Payments, Plans, and Revenue
 
 ### Get payments
@@ -521,6 +623,13 @@ Response `result.content[]`:
   "createdAt": "2026-06-30T14:30:00"
 }
 ```
+
+FE cần làm cho payments:
+
+- Render transaction table: orderCode, username, email, planName, amount, status, createdAt.
+- Status filter: `ALL`, `PENDING`, `SUCCESS`, `FAILED`, `CANCELLED`, `TIMEOUT`.
+- Chỉ xem `SUCCESS` là giao dịch đã tạo doanh thu.
+- Với transaction `PENDING` quá lâu, FE có thể đánh dấu "Cần đối soát" để admin kiểm tra PayOS/ngân hàng.
 
 ### Get revenue statistics
 
@@ -583,6 +692,15 @@ Label format:
 | `MONTH` | `2026-06` |
 | `YEAR` | `2026` |
 
+FE cần làm cho revenue:
+
+- Tạo chart/tab chọn granularity: `HOUR`, `DAY`, `MONTH`, `YEAR`.
+- Với tab tháng có thể gọi thẳng `/admin/payments/revenue/monthly`.
+- Chart dùng `series[].label` làm trục X, `series[].revenue` làm trục Y.
+- Có thể render thêm `transactionCount` trên tooltip.
+- Render summary cards: `totalRevenue`, `transactionCount`, `averageOrderValue`.
+- Nếu FE không truyền `from/to`, BE tự dùng default range.
+
 ### Get monthly revenue statistics
 
 ```http
@@ -636,6 +754,15 @@ Response `result[]`:
 }
 ```
 
+FE cần làm cho plans:
+
+- Render list/card/table các gói storage.
+- Dùng `quotaSize` để hiển thị GB/MB.
+- Dùng `price` để hiển thị VND.
+- Dùng `durationMonths` để hiển thị chu kỳ.
+- Dùng `subscriberCount` để hiển thị số user đang subscribe active.
+- Dùng list plan này cho modal manual storage reconciliation ở User module.
+
 ### Update storage plan
 
 ```http
@@ -663,6 +790,12 @@ Purpose: Update plan metadata. `status` and `features` are stored through Redis-
 
 Response `result`: same shape as one item from `GET /admin/plans`.
 
+FE cần làm khi update plan:
+
+- Form update plan nên cho sửa: planName, quotaSize, price, durationMonths, status, features.
+- `features` là array string.
+- Sau khi update thành công, refetch `GET /admin/plans`.
+
 ### Payment unhappy case notes for FE
 
 User can pay successfully but not receive quota if the PayOS webhook is missed, blocked, fails signature verification, references an unknown `orderCode`, or arrives after the transaction is no longer `PENDING`.
@@ -673,6 +806,16 @@ Recommended FE behavior:
 - If quota is not updated yet, show `Dang xac nhan thanh toan`.
 - Admin can verify bank/PayOS manually and call `PUT /admin/users/{userId}/storage-plan`.
 - Use `GET /admin/payments` to find transaction status and `GET /admin/plans` to select the correct plan.
+
+FE payment reconciliation workflow gợi ý:
+
+1. Admin mở Payments, lọc `PENDING` hoặc tìm theo user/orderCode.
+2. Admin xác nhận ngoài hệ thống rằng tiền đã vào tài khoản.
+3. Admin mở User detail của user đó.
+4. Admin bấm `Set storage plan`.
+5. Admin chọn đúng plan đã thanh toán và nhập reason.
+6. FE gọi `PUT /admin/users/{userId}/storage-plan`.
+7. FE refetch user list để thấy `storageMax` cập nhật.
 
 ## 7. AI Statistics
 
@@ -703,6 +846,12 @@ Response `result`:
   }
 }
 ```
+
+FE cần làm:
+
+- Render stat cards: totalAiMessagesThisMonth, topAiUserMessageCount, knowledgeChatRatio, totalSummarizedDocs.
+- Render chart từ `aiUsageTrendByDay`.
+- Hiện tại dữ liệu AI stats trong BE đang là thống kê phục vụ dashboard, không có pagination detail conversation trong file contract này.
 
 ## 8. System Settings
 
@@ -759,6 +908,15 @@ Purpose: Update system settings in Redis. Missing fields keep current values.
 
 Response `result`: same shape as `GET /admin/settings`.
 
+FE cần làm:
+
+- Load settings trước bằng `GET /admin/settings`.
+- Form nên map đủ field response.
+- Field boolean dùng toggle: maintenanceMode, emailNotificationEnabled, allowRegistration.
+- Field số dùng numeric input: defaultStorageLimit, maxFileSizeUpload, otpExpiryMinutes, sessionTimeoutMinutes, maxLoginAttempts, defaultUserStorage.
+- `allowedFileTypes` hiện là string comma-separated.
+- Khi submit có thể gửi toàn bộ form; BE sẽ giữ giá trị cũ nếu field bị thiếu.
+
 ## 9. Error Handling Summary
 
 Common admin errors:
@@ -775,3 +933,26 @@ Common admin errors:
 | `PAYMENT_GATEWAY_ERROR` | PayOS gateway/webhook verification failed |
 
 FE should not rely only on HTTP status. Use `code` and `message` from the wrapper for user-facing errors.
+
+FE error handling yêu cầu:
+
+- Nếu `code=1402` hoặc message `Account is locked. Please contact support`, user app nên clear token và chuyển về login.
+- Nếu admin API trả `REQUEST_PARAMETER_INVALID`, kiểm tra query params như `status`, `granularity`, `from`, `to`.
+- Nếu `PLAN_NOT_FOUND`, refetch lại `GET /admin/plans`.
+- Nếu `USER_NOT_FOUND`, refetch lại user list vì user có thể đã bị xóa.
+- Với destructive actions, luôn confirm trước khi gọi API.
+
+## 10. QA Checklist For FE
+
+FE nên test tối thiểu các case sau:
+
+- Dashboard không double count user: `totalUsers` không cộng thêm active/locked.
+- User locked không login được, không refresh token được, access token cũ gọi API bị `ACCOUNT_IS_LOCKED`.
+- Lock user từ Admin xong, row đổi sang locked và filter `BANNED` thấy user đó.
+- Unlock user xong, row đổi sang active và filter `ACTIVE` thấy user đó.
+- Storage progress hiển thị đúng bytes to MB/GB.
+- Manual set storage plan cập nhật `storageMax` trên user table/detail.
+- Revenue monthly chart gọi `/admin/payments/revenue/monthly` và render label dạng `yyyy-MM`.
+- Payment table chỉ tính doanh thu cho status `SUCCESS`.
+- Document delete refetch list và stat.
+- Group detail chỉ load members khi gọi detail API.
