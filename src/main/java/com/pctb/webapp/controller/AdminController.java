@@ -1,5 +1,8 @@
 package com.pctb.webapp.controller;
 
+import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
+import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
+import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
 import com.pctb.webapp.dto.request.LockUserRequest;
 import com.pctb.webapp.dto.response.*;
 import com.pctb.webapp.entity.SystemLog;
@@ -13,6 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/admin")
@@ -188,6 +193,21 @@ public class AdminController {
                 .build();
     }
 
+    @Operation(summary = "Page 4: Update study group status")
+    @PutMapping("/groups/{groupId}/status")
+    public ApiResponse<String> updateGroupStatus(
+            @PathVariable String groupId,
+            @RequestBody AdminUpdateGroupStatusRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        String status = adminService.updateGroupStatus(groupId, request, adminName);
+        return ApiResponse.<String>builder()
+                .message("Study group status updated successfully")
+                .result(status)
+                .build();
+    }
+
     // 🌟 ĐÃ ĐỒNG BỘ FIX LỖI: Bổ sung tham số `@AuthenticationPrincipal Jwt jwt` và đẩy `adminName` vào Service để lưu nhật ký Audit Log
     @Operation(summary = "Page 4: Permanently delete a policy-violating study group")
     @DeleteMapping("/groups/{groupId}")
@@ -215,6 +235,29 @@ public class AdminController {
                 .build();
     }
 
+    @Operation(summary = "Page 5: Get storage plans for administration")
+    @GetMapping("/plans")
+    public ApiResponse<List<AdminPlanResponse>> getPlans() {
+        return ApiResponse.<List<AdminPlanResponse>>builder()
+                .message("Get plans successfully")
+                .result(adminService.getPlans())
+                .build();
+    }
+
+    @Operation(summary = "Page 5: Update a storage plan")
+    @PutMapping("/plans/{planId}")
+    public ApiResponse<AdminPlanResponse> updatePlan(
+            @PathVariable String planId,
+            @RequestBody AdminUpdatePlanRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        return ApiResponse.<AdminPlanResponse>builder()
+                .message("Storage plan updated successfully")
+                .result(adminService.updatePlan(planId, request, adminName))
+                .build();
+    }
+
     // ==========================================
     // 🤖 6. TRANG 6: THỐNG KÊ AI (AI STATS)
     // ==========================================
@@ -234,6 +277,19 @@ public class AdminController {
     public ApiResponse<SystemSettingsResponse> getSettings() {
         return ApiResponse.<SystemSettingsResponse>builder()
                 .result(adminService.getSystemSettings())
+                .build();
+    }
+
+    @Operation(summary = "Page 7: Update administrative system settings")
+    @PutMapping("/settings")
+    public ApiResponse<SystemSettingsResponse> updateSettings(
+            @RequestBody AdminUpdateSettingsRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        return ApiResponse.<SystemSettingsResponse>builder()
+                .message("System settings updated successfully")
+                .result(adminService.updateSystemSettings(request, adminName))
                 .build();
     }
 }

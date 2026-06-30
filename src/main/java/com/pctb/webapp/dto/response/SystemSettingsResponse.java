@@ -11,4 +11,11 @@ import lombok.experimental.FieldDefaults;
 public class SystemSettingsResponse {
     String applicationName;
     boolean maintenanceMode;
+    Long defaultStorageLimit;
+    Long maxFileSizeUpload;
+    String allowedFileTypes;
+    Integer otpExpiryMinutes;
+    Integer sessionTimeoutMinutes;
+    Integer maxLoginAttempts;
+    boolean emailNotificationEnabled;
 }

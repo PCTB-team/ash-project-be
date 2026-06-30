@@ -36,4 +36,16 @@ public interface UserRepo extends JpaRepository<User, String> {
 
     // Đếm user tạo sau một thời điểm nhất định
     long countByCreatedAtAfter(LocalDateTime startDateTime);
+
+    @Query("""
+            SELECT COUNT(u)
+            FROM User u
+            WHERE u.storageQuota = :quotaSize
+              AND u.storageExpiredAt IS NOT NULL
+              AND u.storageExpiredAt > :now
+            """)
+    long countActiveSubscribersByQuotaSize(
+            @Param("quotaSize") Long quotaSize,
+            @Param("now") LocalDateTime now
+    );
 }
