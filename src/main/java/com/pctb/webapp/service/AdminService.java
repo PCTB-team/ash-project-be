@@ -2,6 +2,7 @@ package com.pctb.webapp.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pctb.webapp.dto.request.AdminSetUserStoragePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
 import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -160,11 +162,12 @@ public class AdminService {
                         .build())
                 .collect(Collectors.toList());
 
-        long pendingReports = allUsers.stream().filter(u -> !u.isAccountNonLocked()).count();
+        long activeUsers = allUsers.stream().filter(User::isAccountNonLocked).count();
+        long pendingReports = allUsers.size() - activeUsers;
 
         return DashboardStatsResponse.builder()
-                .totalUsers(totalUsers).activeUsersRightNow(activeUsersRightNow == 0 ? 3 : activeUsersRightNow)
-                .newUsersThisMonth(newUsersThisMonth).activeUsers(activeUsersRightNow)
+                .totalUsers(totalUsers).activeUsersRightNow(activeUsersRightNow)
+                .newUsersThisMonth(newUsersThisMonth).activeUsers(activeUsers)
                 .totalRevenue(totalRevenue).revenueThisMonth(revenueThisMonth)
                 .totalStorageUsedBytes(totalStorageUsedBytes).totalStorageCapacityBytes(totalStorageCapacityBytes)
                 .fileTypeDistribution(fileTypeDistribution).totalDocuments(totalDocuments).totalGroups(totalGroups)
@@ -307,6 +310,7 @@ public class AdminService {
             user.setLockedAt(LocalDateTime.now());
             user.setLockedReason(reason != null ? reason : "Banned by Admin due to violations");
             user.setLockedByAdmin(adminName);
+            redisService.delete(refreshTokenKey(user.getId()));
         } else {
             user.setLockedAt(null);
             user.setLockedReason(null);
@@ -318,6 +322,38 @@ public class AdminService {
         String msg = active ? "Admin " + adminName + " unlocked account [" + user.getUsername() + "]"
                 : "Admin " + adminName + " locked account [" + user.getUsername() + "]. Reason: " + reason;
         logService.log(adminName, "USER_ACTION", actionType, user.getId(), msg);
+    }
+
+    @Transactional
+    public UserResponse setUserStoragePlan(String userId, AdminSetUserStoragePlanRequest request, String adminName) {
+        if (request == null || request.getPlanId() == null || request.getPlanId().isBlank()) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+
+        User user = userRepo.findByIdForUpdate(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        StoragePlan plan = storagePlanRepo.findById(request.getPlanId().trim())
+                .orElseThrow(() -> new AppException(ErrorCode.PLAN_NOT_FOUND));
+
+        user.setStorageQuota(plan.getQuotaSize());
+
+        int monthsToAdd = plan.getDurationMonths() != null ? plan.getDurationMonths() : 1;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime currentExpiredAt = user.getStorageExpiredAt();
+        LocalDateTime newExpiredAt = currentExpiredAt == null || currentExpiredAt.isBefore(now)
+                ? now.plusMonths(monthsToAdd)
+                : currentExpiredAt.plusMonths(monthsToAdd);
+        user.setStorageExpiredAt(newExpiredAt);
+
+        User savedUser = userRepo.save(user);
+        String reason = request.getReason() != null && !request.getReason().isBlank()
+                ? request.getReason().trim()
+                : "Manual payment reconciliation";
+        logService.log(adminName, "ADMIN_ACTION", "SET_USER_STORAGE_PLAN", savedUser.getId(),
+                "Admin " + adminName + " set storage plan [" + plan.getPlanName() + "] for user ["
+                        + savedUser.getUsername() + "]. Reason: " + reason);
+
+        return toAdminUserResponse(savedUser);
     }
 
     @Transactional
@@ -579,12 +615,90 @@ public class AdminService {
                 .build());
     }
 
+    @Transactional(readOnly = true)
+    public AdminRevenueStatsResponse getRevenueStats(String granularity, LocalDateTime from, LocalDateTime to) {
+        String normalizedGranularity = normalizeRevenueGranularity(granularity);
+        LocalDateTime resolvedTo = to != null ? to : LocalDateTime.now();
+        LocalDateTime resolvedFrom = from != null ? from : defaultRevenueFrom(normalizedGranularity, resolvedTo);
+
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        }
+
+        Map<String, long[]> groupedRevenue = new TreeMap<>();
+        List<Transaction> successfulTransactions = transactionRepo.findAll().stream()
+                .filter(tx -> tx.getStatus() == TransactionStatus.SUCCESS)
+                .filter(tx -> tx.getCreatedAt() != null)
+                .filter(tx -> !tx.getCreatedAt().isBefore(resolvedFrom) && !tx.getCreatedAt().isAfter(resolvedTo))
+                .collect(Collectors.toList());
+
+        for (Transaction tx : successfulTransactions) {
+            String label = formatRevenueLabel(tx.getCreatedAt(), normalizedGranularity);
+            long amount = tx.getAmount() != null ? tx.getAmount() : 0L;
+            long[] bucket = groupedRevenue.computeIfAbsent(label, ignored -> new long[2]);
+            bucket[0] += amount;
+            bucket[1] += 1;
+        }
+
+        List<AdminRevenueStatItem> series = groupedRevenue.entrySet().stream()
+                .map(entry -> AdminRevenueStatItem.builder()
+                        .label(entry.getKey())
+                        .revenue(entry.getValue()[0])
+                        .transactionCount(entry.getValue()[1])
+                        .build())
+                .collect(Collectors.toList());
+
+        long totalRevenue = series.stream().mapToLong(AdminRevenueStatItem::getRevenue).sum();
+        long transactionCount = series.stream().mapToLong(AdminRevenueStatItem::getTransactionCount).sum();
+        double averageOrderValue = transactionCount == 0
+                ? 0
+                : Math.round(totalRevenue * 100.0 / transactionCount) / 100.0;
+
+        return AdminRevenueStatsResponse.builder()
+                .granularity(normalizedGranularity)
+                .from(resolvedFrom)
+                .to(resolvedTo)
+                .totalRevenue(totalRevenue)
+                .transactionCount(transactionCount)
+                .averageOrderValue(averageOrderValue)
+                .series(series)
+                .build();
+    }
+
     public List<AdminPlanResponse> getPlans() {
         LocalDateTime now = LocalDateTime.now();
         return storagePlanRepo.findAll(Sort.by("quotaSize").ascending())
                 .stream()
                 .map(plan -> toAdminPlanResponse(plan, now))
                 .collect(Collectors.toList());
+    }
+
+    private String normalizeRevenueGranularity(String granularity) {
+        String cleanGranularity = granularity == null || granularity.isBlank()
+                ? "DAY"
+                : granularity.trim().toUpperCase();
+        if (!List.of("HOUR", "DAY", "MONTH", "YEAR").contains(cleanGranularity)) {
+            throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        }
+        return cleanGranularity;
+    }
+
+    private LocalDateTime defaultRevenueFrom(String granularity, LocalDateTime to) {
+        return switch (granularity) {
+            case "HOUR" -> to.minusHours(24);
+            case "MONTH" -> to.minusMonths(12);
+            case "YEAR" -> to.minusYears(5);
+            default -> to.minusDays(30);
+        };
+    }
+
+    private String formatRevenueLabel(LocalDateTime createdAt, String granularity) {
+        return switch (granularity) {
+            case "HOUR" -> createdAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:00"));
+            case "MONTH" -> createdAt.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            case "YEAR" -> createdAt.format(DateTimeFormatter.ofPattern("yyyy"));
+            default -> createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        };
     }
 
     @Transactional
@@ -779,6 +893,10 @@ public class AdminService {
 
     private String firstNonBlank(String value, String fallback) {
         return value != null && !value.isBlank() ? value.trim() : fallback;
+    }
+
+    private String refreshTokenKey(String userId) {
+        return "auth:refresh:" + userId;
     }
 
     // 🌟 PHƯƠNG THỨC TIỆN ÍCH PHÂN TRANG THỦ CÔNG KHÔNG LỆCH NGOẶC

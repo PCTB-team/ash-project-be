@@ -47,10 +47,12 @@ public class User {
     Set<Role> roles;
 
     @Column(nullable = false)
+    @Builder.Default
     boolean verified = false; /// Dùng để theo dõi trạng thái xác thực của user.
 
     // === PHẦN BỔ SUNG ADMIN BUSINESS RULES ===
     @Column(nullable = false)
+    @Builder.Default
     boolean accountNonLocked = true; // true: Bình thường, false: Bị khóa
 
     @Column(name = "locked_at")
@@ -74,9 +76,11 @@ public class User {
 
     // === CẤU TRÚC LẠI BỘ NHỚ VIP THEO BUSINESS MỚI ===
     @Column(name = "storage_quota", nullable = false)
+    @Builder.Default
     Long storageQuota = 524288000L; // Mặc định ban đầu 500MB (= 500 * 1024 * 1024 bytes)
 
     @Column(name = "storage_used", nullable = false)
+    @Builder.Default
     Long storageUsed = 0L;
 
     @Column(name = "storage_expired_at")

@@ -117,6 +117,9 @@ public class OtpService {
                 .fullname(pending.getFullname())
                 .password(pending.getEncodedPassword())
                 .verified(true)
+                .accountNonLocked(true)
+                .storageQuota(524288000L)
+                .storageUsed(0L)
                 .roles(Set.of(userRole))
                 .build();
 
