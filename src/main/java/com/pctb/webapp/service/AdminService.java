@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pctb.webapp.dto.request.AdminSetUserStoragePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
+import com.pctb.webapp.dto.request.AdminUpdateHomepageConfigRequest;
 import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
 import com.pctb.webapp.dto.response.*;
@@ -46,6 +47,7 @@ public class AdminService {
     ObjectMapper objectMapper;
 
     static String ADMIN_SETTINGS_KEY = "admin:system:settings";
+    static String ADMIN_HOMEPAGE_CONFIG_KEY = "admin:homepage:config";
     static String ADMIN_PLAN_STATUS_PREFIX = "admin:plan:status:";
     static String ADMIN_PLAN_FEATURES_PREFIX = "admin:plan:features:";
 
@@ -378,6 +380,7 @@ public class AdminService {
     // =========================================================================
     // 📚 TRANG 3: GIÁM SÁT TÀI LIỆU (Giám sát dung lượng ổ đĩa đám mây Cloudinary)
     // =========================================================================
+    @Transactional(readOnly = true)
     public Page<AdminDocumentResponse> getAllDocumentsPaged(int page, int size, String keyword, String fileType) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         List<Document> docList;
@@ -385,7 +388,7 @@ public class AdminService {
             String cleanKw = keyword.trim().toLowerCase();
             docList = documentRepo.findAll().stream()
                     .filter(d -> (d.getFileName() != null && d.getFileName().toLowerCase().contains(cleanKw))
-                            || (d.getOwner() != null && d.getOwner().getUsername().toLowerCase().contains(cleanKw)))
+                            || ownerUsername(d).toLowerCase().contains(cleanKw))
                     .collect(Collectors.toList());
         } else {
             docList = documentRepo.findAll(Sort.by("createdAt").descending());
@@ -406,8 +409,8 @@ public class AdminService {
                         .fileName(d.getFileName())
                         .fileExtension(d.getFileExtension())
                         .fileSize(d.getFileSize())
-                        .ownerUsername(d.getOwner() != null ? d.getOwner().getUsername() : "Unknown")
-                        .ownerEmail(d.getOwner() != null ? d.getOwner().getEmail() : "N/A")
+                        .ownerUsername(ownerUsername(d))
+                        .ownerEmail(ownerEmail(d))
                         .deleted(d.getDeleted() != null ? d.getDeleted() : false)
                         .createdAt(d.getCreatedAt())
                         .build())
@@ -425,9 +428,10 @@ public class AdminService {
         documentRepo.save(doc);
 
         logService.log(adminName, "DOCUMENT_LOG", "ADMIN_DELETE_DOC", doc.getId(),
-                "Admin " + adminName + " removed policy-violating file [" + doc.getFileName() + "] owned by user [" + doc.getOwner().getUsername() + "]");
+                "Admin " + adminName + " removed policy-violating file [" + doc.getFileName() + "] owned by user [" + ownerUsername(doc) + "]");
     }
 
+    @Transactional(readOnly = true)
     public AdminDocumentStatsResponse getDocumentGridStatistics() {
         List<Document> allDocs = documentRepo.findAll();
 
@@ -441,7 +445,7 @@ public class AdminService {
 
         Map<String, Long> userUploadCountMap = allDocs.stream()
                 .filter(d -> d.getOwner() != null)
-                .collect(Collectors.groupingBy(d -> d.getOwner().getUsername(), Collectors.counting()));
+                .collect(Collectors.groupingBy(this::ownerUsername, Collectors.counting()));
 
         Map.Entry<String, Long> topUploaderEntry = userUploadCountMap.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
@@ -454,6 +458,22 @@ public class AdminService {
                 .topUploaderUsername(topUploaderEntry != null ? topUploaderEntry.getKey() : "N/A")
                 .topUploaderFileCount(topUploaderEntry != null ? topUploaderEntry.getValue() : 0L)
                 .build();
+    }
+
+    private String ownerUsername(Document document) {
+        if (document == null || document.getOwner() == null || document.getOwner().getUsername() == null
+                || document.getOwner().getUsername().isBlank()) {
+            return "Unknown";
+        }
+        return document.getOwner().getUsername();
+    }
+
+    private String ownerEmail(Document document) {
+        if (document == null || document.getOwner() == null || document.getOwner().getEmail() == null
+                || document.getOwner().getEmail().isBlank()) {
+            return "N/A";
+        }
+        return document.getOwner().getEmail();
     }
 
     // =========================================================================
@@ -883,6 +903,40 @@ public class AdminService {
         return updatedSettings;
     }
 
+    public HomepageConfigResponse getHomepageConfig() {
+        String savedConfig = redisService.get(ADMIN_HOMEPAGE_CONFIG_KEY);
+        if (savedConfig != null) {
+            try {
+                return objectMapper.readValue(savedConfig, HomepageConfigResponse.class);
+            } catch (JsonProcessingException ignored) {
+                redisService.delete(ADMIN_HOMEPAGE_CONFIG_KEY);
+            }
+        }
+        return defaultHomepageConfig();
+    }
+
+    public HomepageConfigResponse updateHomepageConfig(AdminUpdateHomepageConfigRequest request, String adminName) {
+        if (request == null) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        HomepageConfigResponse currentConfig = getHomepageConfig();
+        HomepageConfigResponse updatedConfig = HomepageConfigResponse.builder()
+                .heroTitle(firstNonBlank(request.getHeroTitle(), currentConfig.getHeroTitle()))
+                .heroSubtitle(firstNonBlank(request.getHeroSubtitle(), currentConfig.getHeroSubtitle()))
+                .primaryColor(firstNonBlank(request.getPrimaryColor(), currentConfig.getPrimaryColor()))
+                .videoBackgroundUrl(firstNonBlank(request.getVideoBackgroundUrl(), currentConfig.getVideoBackgroundUrl()))
+                .activeFeatures(request.getActiveFeatures() != null ? request.getActiveFeatures() : currentConfig.getActiveFeatures())
+                .build();
+        try {
+            redisService.set(ADMIN_HOMEPAGE_CONFIG_KEY, objectMapper.writeValueAsString(updatedConfig));
+        } catch (JsonProcessingException exception) {
+            throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
+        }
+        logService.log(adminName, "ADMIN_ACTION", "UPDATE_HOMEPAGE_CONFIG", "SYSTEM",
+                "Admin " + adminName + " updated homepage configuration");
+        return updatedConfig;
+    }
+
     private SystemSettingsResponse defaultSystemSettings() {
         return SystemSettingsResponse.builder()
                 .applicationName("AI StudyHub Portal v1.0")
@@ -896,6 +950,16 @@ public class AdminService {
                 .emailNotificationEnabled(true)
                 .allowRegistration(true)
                 .defaultUserStorage(524288000L)
+                .build();
+    }
+
+    private HomepageConfigResponse defaultHomepageConfig() {
+        return HomepageConfigResponse.builder()
+                .heroTitle("Hoc tap hieu qua voi AI")
+                .heroSubtitle("Chia se tai lieu va ket noi nhom hoc tap")
+                .primaryColor("#ff5c00")
+                .videoBackgroundUrl("")
+                .activeFeatures(List.of("DOCUMENTS", "GROUPS", "AI"))
                 .build();
     }
 

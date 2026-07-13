@@ -76,6 +76,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/settings/intro").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/settings/intro").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/groups/invite/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/admin/dashboard/stats")
+                        .hasAnyAuthority("ROLE_ADMIN", "ADMIN", "SCOPE_ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/groups/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/documents/**").hasAnyRole("USER", "ADMIN")
