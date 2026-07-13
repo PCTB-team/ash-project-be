@@ -45,6 +45,7 @@ FE cần triển khai các màn Admin theo các nhóm sau:
 | Plans | Danh sách gói storage, update plan metadata, dùng list plan cho manual storage reconciliation |
 | AI Stats | Stat cards và chart usage theo ngày trong tuần |
 | Settings | Form settings, load current settings, submit update |
+| Homepage Config | Form cấu hình nội dung Landing/Homepage, load current config, submit update |
 | Error Handling | Đọc `code` và `message`, không chỉ dựa vào HTTP status |
 
 Frontend route gợi ý:
@@ -59,6 +60,7 @@ Frontend route gợi ý:
 | Payments/Revenue/Plans | `/admin/payments` |
 | AI Stats | `/admin/ai` |
 | Settings | `/admin/settings` |
+| Homepage Config | `/admin/homepage-config` |
 
 Common FE rules:
 
@@ -917,7 +919,58 @@ FE cần làm:
 - `allowedFileTypes` hiện là string comma-separated.
 - Khi submit có thể gửi toàn bộ form; BE sẽ giữ giá trị cũ nếu field bị thiếu.
 
-## 9. Error Handling Summary
+## 9. Homepage Config
+
+### Get homepage configuration
+
+```http
+GET /admin/homepage-config
+```
+
+Purpose: Load configurable Landing/Homepage content for Admin UI.
+
+Response `result`:
+
+```json
+{
+  "heroTitle": "Hoc tap hieu qua voi AI",
+  "heroSubtitle": "Chia se tai lieu va ket noi nhom hoc tap",
+  "primaryColor": "#ff5c00",
+  "videoBackgroundUrl": "",
+  "activeFeatures": ["DOCUMENTS", "GROUPS", "AI"]
+}
+```
+
+### Update homepage configuration
+
+```http
+PUT /admin/homepage-config
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "heroTitle": "Hoc tap hieu qua voi AI",
+  "heroSubtitle": "Chia se va ket noi",
+  "primaryColor": "#ff5c00",
+  "videoBackgroundUrl": "https://example.com/background.mp4",
+  "activeFeatures": ["DOCUMENTS", "GROUPS", "AI"]
+}
+```
+
+Purpose: Update Landing/Homepage content in Redis. Missing string fields keep current values; `activeFeatures` is replaced only when present.
+
+Response `result`: same shape as `GET /admin/homepage-config`.
+
+FE cần làm:
+
+- Load config bằng `GET /admin/homepage-config`.
+- Form nên map đủ field response: `heroTitle`, `heroSubtitle`, `primaryColor`, `videoBackgroundUrl`, `activeFeatures`.
+- Sau khi submit thành công, refetch config hoặc update local state bằng response `result`.
+
+## 10. Error Handling Summary
 
 Common admin errors:
 
@@ -942,7 +995,7 @@ FE error handling yêu cầu:
 - Nếu `USER_NOT_FOUND`, refetch lại user list vì user có thể đã bị xóa.
 - Với destructive actions, luôn confirm trước khi gọi API.
 
-## 10. QA Checklist For FE
+## 11. QA Checklist For FE
 
 FE nên test tối thiểu các case sau:
 

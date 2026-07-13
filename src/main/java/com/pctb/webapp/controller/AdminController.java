@@ -1,6 +1,7 @@
 package com.pctb.webapp.controller;
 
 import com.pctb.webapp.dto.request.AdminUpdateGroupStatusRequest;
+import com.pctb.webapp.dto.request.AdminUpdateHomepageConfigRequest;
 import com.pctb.webapp.dto.request.AdminUpdatePlanRequest;
 import com.pctb.webapp.dto.request.AdminUpdateSettingsRequest;
 import com.pctb.webapp.dto.request.AdminSetUserStoragePlanRequest;
@@ -330,6 +331,28 @@ public class AdminController {
         return ApiResponse.<SystemSettingsResponse>builder()
                 .message("System settings updated successfully")
                 .result(adminService.updateSystemSettings(request, adminName))
+                .build();
+    }
+
+    @Operation(summary = "Page 8: Get homepage/landing page configuration")
+    @GetMapping("/homepage-config")
+    public ApiResponse<HomepageConfigResponse> getHomepageConfig() {
+        return ApiResponse.<HomepageConfigResponse>builder()
+                .message("Get homepage configuration successfully")
+                .result(adminService.getHomepageConfig())
+                .build();
+    }
+
+    @Operation(summary = "Page 8: Update homepage/landing page configuration")
+    @PutMapping("/homepage-config")
+    public ApiResponse<HomepageConfigResponse> updateHomepageConfig(
+            @RequestBody AdminUpdateHomepageConfigRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
+        return ApiResponse.<HomepageConfigResponse>builder()
+                .message("Homepage configuration updated successfully")
+                .result(adminService.updateHomepageConfig(request, adminName))
                 .build();
     }
 }
