@@ -45,6 +45,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.text.Normalizer;
 import java.util.ArrayDeque;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -316,6 +317,7 @@ public class AiChatService {
 
         return AiKnowledgeChatRequest.builder()
                 .conversationId(conversation.getId())
+                .documentId(conversation.getDocumentId())
                 .folderId(conversation.getFolderId())
                 .message(request.getMessage())
                 .build();
@@ -882,12 +884,12 @@ public class AiChatService {
         }
 
         String normalizedFileName = normalizeTextForMatching(fileName);
-        if (normalizedMessage.contains(normalizedFileName)) {
+        if (matchesNormalizedText(normalizedMessage, normalizedFileName)) {
             return true;
         }
 
-        String baseName = removeFileExtension(normalizedFileName);
-        return baseName.length() >= 3 && normalizedMessage.contains(baseName);
+        String baseName = normalizeTextForMatching(removeFileExtension(fileName));
+        return baseName.length() >= 3 && matchesNormalizedText(normalizedMessage, baseName);
     }
 
     private boolean matchesFolderName(String normalizedMessage, String folderName) {
@@ -896,11 +898,40 @@ public class AiChatService {
         }
 
         String normalizedFolderName = normalizeTextForMatching(folderName);
-        return normalizedFolderName.length() >= 3 && normalizedMessage.contains(normalizedFolderName);
+        return normalizedFolderName.length() >= 3 && matchesNormalizedText(normalizedMessage, normalizedFolderName);
     }
 
     private String normalizeTextForMatching(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        if (value == null) {
+            return "";
+        }
+
+        String normalizedValue = Normalizer.normalize(
+                        value.trim().toLowerCase(Locale.ROOT).replace('đ', 'd'),
+                        Normalizer.Form.NFD
+                )
+                .replaceAll("\\p{M}+", "")
+                .replaceAll("[^\\p{Alnum}]+", " ")
+                .trim();
+
+        return normalizedValue.replaceAll("\\s+", " ");
+    }
+
+    private boolean matchesNormalizedText(String normalizedMessage, String normalizedName) {
+        if (!hasText(normalizedMessage) || !hasText(normalizedName)) {
+            return false;
+        }
+
+        if (normalizedMessage.contains(normalizedName)) {
+            return true;
+        }
+
+        return compactTextForMatching(normalizedMessage)
+                .contains(compactTextForMatching(normalizedName));
+    }
+
+    private String compactTextForMatching(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "");
     }
 
     private String removeFileExtension(String fileName) {
