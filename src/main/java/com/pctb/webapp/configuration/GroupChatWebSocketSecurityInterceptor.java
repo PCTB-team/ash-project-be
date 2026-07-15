@@ -64,7 +64,17 @@ public class GroupChatWebSocketSecurityInterceptor implements ChannelInterceptor
 
     private void authorizeGroupSubscription(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
-        if (destination == null || !destination.startsWith("/topic/groups/") || !destination.endsWith("/messages")) {
+        if (destination == null || !destination.startsWith("/topic/groups/")) {
+            return;
+        }
+
+        String destinationSuffix;
+        // Kênh messages dùng cho chat, kênh events dùng cho sự kiện như xóa nhóm.
+        if (destination.endsWith("/messages")) {
+            destinationSuffix = "/messages";
+        } else if (destination.endsWith("/events")) {
+            destinationSuffix = "/events";
+        } else {
             return;
         }
 
@@ -74,9 +84,10 @@ public class GroupChatWebSocketSecurityInterceptor implements ChannelInterceptor
 
         String groupId = destination
                 .replaceFirst("^/topic/groups/", "")
-                .replaceFirst("/messages$", "");
+                .replaceFirst(destinationSuffix + "$", "");
         String userId = accessor.getUser().getName();
 
+        // Chỉ member hoặc owner của nhóm mới được subscribe các kênh realtime của nhóm.
         boolean isMember = groupMemberRepo.findByGroupIdAndUserId(groupId, userId).isPresent();
         boolean isOwner = studyGroupRepo.findById(groupId)
                 .map(StudyGroup::getOwner)

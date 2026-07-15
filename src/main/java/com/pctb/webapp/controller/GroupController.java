@@ -7,6 +7,7 @@ import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
+import com.pctb.webapp.dto.response.DeleteGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPageResponse;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -181,6 +183,22 @@ public class GroupController {
         return ApiResponse.<GroupMemberResponse>builder()
                 .message("Leave group successfully")
                 .result(groupService.leaveGroup(groupId, authentication))
+                .build();
+    }
+
+    /**
+     * API cho phép trưởng nhóm xóa vĩnh viễn nhóm.
+     * FE chỉ cần truyền groupId trên URL, không cần gửi request body.
+     */
+    @Operation(summary = "Delete group permanently")
+    @DeleteMapping("/{groupId}")
+    public ApiResponse<DeleteGroupResponse> deleteGroup(
+            @PathVariable String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        return ApiResponse.<DeleteGroupResponse>builder()
+                .message("Delete group successfully")
+                .result(groupService.deleteGroup(groupId, authentication))
                 .build();
     }
 

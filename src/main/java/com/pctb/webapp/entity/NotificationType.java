@@ -11,5 +11,7 @@ public enum NotificationType {
     GROUP_FILE_RESTORED,
     GROUP_MEMBER_KICKED,
     GROUP_MEMBER_LEFT,
-    GROUP_PASSWORD_CHANGED
+    GROUP_PASSWORD_CHANGED,
+    // Thông báo cho member biết trưởng nhóm đã xóa toàn bộ nhóm.
+    GROUP_DELETED
 }

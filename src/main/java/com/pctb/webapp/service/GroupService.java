@@ -6,26 +6,31 @@ import com.pctb.webapp.dto.request.UpdateChatPermissionRequest;
 import com.pctb.webapp.dto.request.UpdateGroupPasswordRequest;
 import com.pctb.webapp.dto.request.UpdateUploadPermissionRequest;
 import com.pctb.webapp.dto.response.CreateGroupResponse;
+import com.pctb.webapp.dto.response.DeleteGroupResponse;
 import com.pctb.webapp.dto.response.GroupMemberResponse;
 import com.pctb.webapp.dto.response.GroupMembersResponse;
 import com.pctb.webapp.dto.response.GroupPageResponse;
 import com.pctb.webapp.dto.response.GroupPreviewResponse;
 import com.pctb.webapp.dto.response.GroupSummaryResponse;
 import com.pctb.webapp.entity.GroupMember;
+import com.pctb.webapp.entity.GroupFile;
 import com.pctb.webapp.entity.GroupRole;
 import com.pctb.webapp.entity.NotificationType;
 import com.pctb.webapp.entity.StudyGroup;
 import com.pctb.webapp.entity.User;
 import com.pctb.webapp.exception.AppException;
 import com.pctb.webapp.exception.ErrorCode;
+import com.pctb.webapp.event.GroupDeletedEvent;
 import com.pctb.webapp.repository.GroupFileRepo;
 import com.pctb.webapp.repository.GroupMemberRepo;
+import com.pctb.webapp.repository.GroupMessageRepo;
 import com.pctb.webapp.repository.StudyGroupRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -51,11 +56,15 @@ public class GroupService {
 
     GroupFileRepo groupFileRepo;
 
+    GroupMessageRepo groupMessageRepo;
+
     UserRepo userRepo;
 
     PasswordEncoder passwordEncoder;
 
     NotificationService notificationService;
+
+    ApplicationEventPublisher eventPublisher;
 
     @Value("${app.group.invite-base-url:http://localhost:3000/join}")
     @NonFinal
@@ -375,6 +384,76 @@ public class GroupService {
         groupMemberRepo.delete(member);
 
         return response;
+    }
+
+    /**
+     * Xóa vĩnh viễn nhóm và toàn bộ dữ liệu thuộc nhóm.
+     * Chỉ user đang là owner/leader của nhóm mới được thực hiện chức năng này.
+     */
+    @Transactional
+    public DeleteGroupResponse deleteGroup(
+            String groupId,
+            JwtAuthenticationToken authentication
+    ) {
+        // Lấy user từ JWT và lấy nhóm cần xóa từ DB.
+        User currentUser = getCurrentUser(authentication);
+        StudyGroup group = getGroupById(groupId);
+
+        // Owner là leader duy nhất có quyền xóa toàn bộ nhóm.
+        if (!group.getOwner().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.GROUP_LEADER_PERMISSION_REQUIRED);
+        }
+
+        // Giữ lại thông tin nhóm vì sau khi xóa DB sẽ không thể đọc lại entity này.
+        String deletedGroupId = group.getId();
+        String deletedGroupName = group.getName();
+        String deletedAt = LocalDateTime.now().toString();
+
+        // Giữ URL file để listener có thể xóa file vật lý sau khi transaction DB commit.
+        List<String> storageUrls = groupFileRepo.findByGroupIdOrderByUploadedAtDesc(deletedGroupId)
+                .stream()
+                .map(GroupFile::getStorageUrl)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        // Tạo thông báo trước khi xóa membership để lấy được đầy đủ danh sách member.
+        // Leader bị loại khỏi danh sách nhận vì chính leader là người thực hiện thao tác.
+        notificationService.createForGroupMembers(
+                group,
+                currentUser,
+                NotificationType.GROUP_DELETED,
+                "Group deleted",
+                "Group \"" + deletedGroupName + "\" was deleted by the leader.",
+                NotificationType.GROUP,
+                deletedGroupId,
+                deletedGroupName,
+                Set.of(currentUser.getId())
+        );
+
+        // Xóa bảng con trước để không vi phạm khóa ngoại trỏ tới study_group.
+        groupMessageRepo.deleteByGroupId(deletedGroupId);
+        groupFileRepo.deleteByGroupId(deletedGroupId);
+        groupMemberRepo.deleteByGroupId(deletedGroupId);
+        studyGroupRepo.deleteExistingById(deletedGroupId);
+
+        // Đẩy các lệnh xóa xuống DB ngay trong transaction để phát hiện lỗi trước khi trả response.
+        studyGroupRepo.flush();
+
+        // Listener chỉ xử lý realtime và Cloudinary sau khi transaction commit thành công.
+        eventPublisher.publishEvent(new GroupDeletedEvent(
+                deletedGroupId,
+                deletedGroupName,
+                deletedAt,
+                storageUrls
+        ));
+
+        // Trả thông tin gọn để FE hiển thị toast và cập nhật danh sách nhóm.
+        return DeleteGroupResponse.builder()
+                .groupId(deletedGroupId)
+                .groupName(deletedGroupName)
+                .deletedAt(deletedAt)
+                .build();
     }
 
     @Transactional
