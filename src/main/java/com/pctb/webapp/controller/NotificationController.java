@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
     NotificationService notificationService;
 
-    @Operation(summary = "Get my notifications")
+    @Operation(summary = "Lấy danh sách thông báo của tôi")
     @GetMapping
     public ApiResponse<NotificationListResponse> getMyNotifications(
             @RequestParam(required = false) Boolean read,
@@ -32,19 +32,19 @@ public class NotificationController {
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<NotificationListResponse>builder()
-                .message("Get notifications successfully")
+                .message("Lấy danh sách thông báo thành công")
                 .result(notificationService.getMyNotifications(read, page, size, authentication))
                 .build();
     }
 
-    @Operation(summary = "Mark notifications as read")
+    @Operation(summary = "Đánh dấu thông báo đã đọc")
     @PutMapping("/read")
     public ApiResponse<NotificationListResponse> markAsRead(
             @RequestBody MarkNotificationReadRequest request,
             JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<NotificationListResponse>builder()
-                .message("Mark notifications as read successfully")
+                .message("Đánh dấu thông báo đã đọc thành công")
                 .result(notificationService.markAsRead(request, authentication))
                 .build();
     }

@@ -129,9 +129,9 @@ public class GroupFileService {
                 group,
                 currentUser,
                 NotificationType.GROUP_FILE_UPLOADED,
-                "Tai lieu moi trong nhom",
-                currentUser.getFullname() + " da tai len \"" + groupFile.getFileName()
-                        + "\" trong nhom \"" + group.getName() + "\".",
+                "Tài liệu mới trong nhóm",
+                currentUser.getFullname() + " đã tải lên \"" + groupFile.getFileName()
+                        + "\" trong nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP_FILE,
                 groupFile.getId(),
                 groupFile.getFileName(),
@@ -256,13 +256,13 @@ public class GroupFileService {
         groupFile.setDeletedAt(LocalDateTime.now());
         groupFileRepo.save(groupFile);
 
-        // Bao cho cac thanh vien khac biet file da duoc dua vao thung rac.
+        // Thông báo cho các thành viên khác biết tài liệu đã được đưa vào thùng rác.
         notificationService.createForGroupMembers(
                 groupFile.getGroup(),
                 currentUser,
                 NotificationType.GROUP_FILE_MOVED_TO_TRASH,
-                "Tai lieu da bi xoa",
-                "\"" + groupFile.getFileName() + "\" da duoc chuyen vao thung rac trong nhom \""
+                "Tài liệu đã bị xóa",
+                "\"" + groupFile.getFileName() + "\" đã được chuyển vào thùng rác trong nhóm \""
                         + groupFile.getGroup().getName() + "\".",
                 NotificationType.GROUP_FILE,
                 groupFile.getId(),
@@ -325,8 +325,8 @@ public class GroupFileService {
                 savedFile.getGroup(),
                 currentUser,
                 NotificationType.GROUP_FILE_RESTORED,
-                "Tai lieu da duoc khoi phuc",
-                "\"" + savedFile.getFileName() + "\" da duoc khoi phuc trong nhom \""
+                "Tài liệu đã được khôi phục",
+                "\"" + savedFile.getFileName() + "\" đã được khôi phục trong nhóm \""
                         + savedFile.getGroup().getName() + "\".",
                 NotificationType.GROUP_FILE,
                 savedFile.getId(),

@@ -87,7 +87,7 @@ public class GroupChatWebSocketSecurityInterceptor implements ChannelInterceptor
                 .replaceFirst(destinationSuffix + "$", "");
         String userId = accessor.getUser().getName();
 
-        // Chỉ member hoặc owner của nhóm mới được subscribe các kênh realtime của nhóm.
+        // Chỉ member hoặc owner của nhóm mới được subscribe các kênh realtime của nhóm.  
         boolean isMember = groupMemberRepo.findByGroupIdAndUserId(groupId, userId).isPresent();
         boolean isOwner = studyGroupRepo.findById(groupId)
                 .map(StudyGroup::getOwner)
