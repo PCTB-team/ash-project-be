@@ -47,10 +47,14 @@ public class AdminController {
     public ApiResponse<Page<SystemLog>> getSystemAuditLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String logType
+            @RequestParam(required = false) String logType,
+            @RequestParam(required = false) String actor,
+            @RequestParam(defaultValue = "false") boolean currentAdminOnly,
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        String resolvedActor = currentAdminOnly && jwt != null ? jwt.getClaimAsString("sub") : actor;
         return ApiResponse.<Page<SystemLog>>builder()
-                .result(adminService.getSystemAuditLogsPaged(page, size, logType))
+                .result(adminService.getSystemAuditLogsPaged(page, size, logType, resolvedActor))
                 .build();
     }
 
