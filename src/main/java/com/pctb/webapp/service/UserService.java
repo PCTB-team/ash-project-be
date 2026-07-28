@@ -30,6 +30,7 @@ import java.util.List;
 public class UserService {
     UserRepo userRepo;
     DocumentRepo documentRepo;
+    UserStorageUsageService userStorageUsageService;
     UserLoginHistoryRepo userLoginHistoryRepo;
     UserMapper userMapper;
     CloudinaryStorageService CloudinaryStorageService;
@@ -61,12 +62,12 @@ public class UserService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        Long usedStorageResult = documentRepo.sumFileSizeByOwner(user);
-        long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
+        // Tính cả tài liệu dashboard và file do user upload vào các group.
+        long usedStorage = userStorageUsageService.getUsedStorage(user);
 
         // CHỖ SỬA CHÍ MẠNG: Thay vì ép cứng lấy maxUserStorage từ file cấu hình,
         // hệ thống sẽ bốc trường storageQuota trực tiếp từ User dưới Database lên để kiểm tra.
-        long maxStorage = user.getStorageQuota() != null ? user.getStorageQuota() : maxUserStorage;
+        long maxStorage = userStorageUsageService.getStorageQuota(user, maxUserStorage);
 
         long remainingStorage = Math.max(0, maxStorage - usedStorage);
 

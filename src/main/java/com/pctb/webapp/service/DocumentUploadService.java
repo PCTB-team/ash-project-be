@@ -46,6 +46,8 @@ public class DocumentUploadService {
 
     QdrantService qdrantService;
 
+    UserStorageUsageService userStorageUsageService;
+
     LogService logService;
 
     @Value("${app.upload.max-user-storage}")
@@ -80,7 +82,8 @@ public class DocumentUploadService {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
 
-        validateStorageCapacity(owner, existingDocument, file.getSize());
+        long replacedFileSize = existingDocument == null ? 0 : safeFileSize(existingDocument);
+        userStorageUsageService.validateCapacity(owner, replacedFileSize, file.getSize(), maxUserStorage);
 
         String storageUrl = storageService.upload(file, storedFileName);
         LocalDateTime now = DateTimeUtils.nowUtc();
@@ -249,17 +252,4 @@ public class DocumentUploadService {
         return days / 365 + " years ago";
     }
 
-    // Kiểm tra tổng dung lượng sau upload hoặc replace có vượt giới hạn storage của user hay không.
-    private void validateStorageCapacity(User owner, Document existingDocument, long newFileSize) {
-        Long usedStorageResult = documentRepo.sumFileSizeByOwner(owner);
-        long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
-        long replacedFileSize = existingDocument == null || existingDocument.getFileSize() == null
-                ? 0
-                : existingDocument.getFileSize();
-        long projectedStorage = usedStorage - replacedFileSize + newFileSize;
-
-        if (projectedStorage > maxUserStorage) {
-            throw new AppException(ErrorCode.STORAGE_NOT_ENOUGH);
-        }
-    }
 }

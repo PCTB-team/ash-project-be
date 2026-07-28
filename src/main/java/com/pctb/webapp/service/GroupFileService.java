@@ -65,6 +65,8 @@ public class GroupFileService {
 
     QdrantService qdrantService;
 
+    UserStorageUsageService userStorageUsageService;
+
     NotificationService notificationService;
 
     @Value("${app.upload.max-user-storage}")
@@ -82,7 +84,7 @@ public class GroupFileService {
             Boolean replaceExisting,
             JwtAuthenticationToken authentication
     ) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = getCurrentUserForUpdate(authentication);
         GroupMember membership = requireUploadPermission(groupId, currentUser);
         StudyGroup group = membership.getGroup();
 
@@ -97,6 +99,18 @@ public class GroupFileService {
         if (existingFile != null && !shouldReplace) {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
+
+        // File group tính vào quota của người upload; replace chỉ trừ file cũ nếu cùng uploader.
+        long replacedFileSize = existingFile != null
+                && existingFile.getUploadedBy().getId().equals(currentUser.getId())
+                ? safeFileSize(existingFile)
+                : 0;
+        userStorageUsageService.validateCapacity(
+                currentUser,
+                replacedFileSize,
+                file.getSize(),
+                maxUserStorage
+        );
 
         String storageUrl = storageService.upload(file, storageFileName);
         LocalDateTime now = LocalDateTime.now();
@@ -205,7 +219,13 @@ public class GroupFileService {
             throw new AppException(ErrorCode.FILE_ALREADY_EXISTS);
         }
 
-        validateStorageCapacity(currentUser, existingDocument, safeFileSize(groupFile));
+        long replacedFileSize = existingDocument == null ? 0 : safeFileSize(existingDocument);
+        userStorageUsageService.validateCapacity(
+                currentUser,
+                replacedFileSize,
+                safeFileSize(groupFile),
+                maxUserStorage
+        );
 
         String extension = normalizeFileExtension(groupFile);
         String storageFileName = buildDocumentStoredFileName(currentUser.getId(), extension);
@@ -363,6 +383,12 @@ public class GroupFileService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Khóa user trong lúc upload để hai request đồng thời không cùng vượt quota.
+    private User getCurrentUserForUpdate(JwtAuthenticationToken authentication) {
+        return userRepo.findByIdForUpdate(authentication.getName())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
     private GroupMember requireUploadPermission(String groupId, User currentUser) {
         GroupMember member = requireApprovedMember(groupId, currentUser);
         if (!Boolean.TRUE.equals(member.getCanUpload())) {
@@ -422,19 +448,6 @@ public class GroupFileService {
 
         return folderRepo.findActiveByIdAndOwnerId(folderId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
-    }
-
-    private void validateStorageCapacity(User owner, Document existingDocument, long newFileSize) {
-        Long usedStorageResult = documentRepo.sumFileSizeByOwner(owner);
-        long usedStorage = usedStorageResult == null ? 0 : usedStorageResult;
-        long replacedFileSize = existingDocument == null || existingDocument.getFileSize() == null
-                ? 0
-                : existingDocument.getFileSize();
-        long projectedStorage = usedStorage - replacedFileSize + newFileSize;
-
-        if (projectedStorage > maxUserStorage) {
-            throw new AppException(ErrorCode.STORAGE_NOT_ENOUGH);
-        }
     }
 
     private void updateFolderSizeCascade(Folder folder, long delta) {

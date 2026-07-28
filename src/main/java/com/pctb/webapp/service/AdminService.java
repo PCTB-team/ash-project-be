@@ -45,6 +45,7 @@ public class AdminService {
     UserMapper userMapper;
     RedisService redisService;
     ObjectMapper objectMapper;
+    UserStorageUsageService userStorageUsageService;
 
     static String ADMIN_SETTINGS_KEY = "admin:system:settings";
     static String ADMIN_HOMEPAGE_CONFIG_KEY = "admin:homepage:config";
@@ -283,8 +284,7 @@ public class AdminService {
     private UserResponse toAdminUserResponse(User user) {
         UserResponse response = userMapper.toUserResponse(user);
         response.setAccountNonLocked(!isExplicitlyLocked(user));
-        Long usedStorage = documentRepo.sumFileSizeByOwner(user);
-        response.setStorageUsed(usedStorage != null ? usedStorage : 0L);
+        response.setStorageUsed(userStorageUsageService.getUsedStorage(user));
         response.setDocumentsCount(documentRepo.countActiveByOwner(user));
         return response;
     }
