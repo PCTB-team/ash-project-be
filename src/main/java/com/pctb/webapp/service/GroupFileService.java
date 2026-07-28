@@ -59,6 +59,12 @@ public class GroupFileService {
 
     StorageService storageService;
 
+    DocumentIndexingService documentIndexingService;
+
+    DocumentTextExtractorService documentTextExtractorService;
+
+    QdrantService qdrantService;
+
     NotificationService notificationService;
 
     @Value("${app.upload.max-user-storage}")
@@ -201,14 +207,6 @@ public class GroupFileService {
 
         validateStorageCapacity(currentUser, existingDocument, safeFileSize(groupFile));
 
-        if (existingDocument != null) {
-            storageService.delete(existingDocument.getStorageUrl());
-            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
-                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
-            }
-            documentRepo.delete(existingDocument);
-        }
-
         String extension = normalizeFileExtension(groupFile);
         String storageFileName = buildDocumentStoredFileName(currentUser.getId(), extension);
         String storageUrl = storageService.copy(groupFile.getStorageUrl(), storageFileName);
@@ -230,6 +228,29 @@ public class GroupFileService {
                 .build();
 
         Document savedDocument = documentRepo.save(document);
+
+        // Lập chỉ mục để AI có thể tìm và đọc tài liệu vừa lưu từ nhóm.
+        if (documentTextExtractorService.supportsIndexing(savedDocument.getFileName())) {
+            try {
+                documentIndexingService.indexDocument(savedDocument.getId());
+            } catch (Exception exception) {
+                qdrantService.deleteDocumentChunks(currentUser.getId(), savedDocument.getId());
+                storageService.delete(savedDocument.getStorageUrl());
+                documentRepo.delete(savedDocument);
+                throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
+            }
+        }
+
+        // Khi ghi đè, xóa toàn bộ dữ liệu của tài liệu cũ sau khi tài liệu mới đã được lưu và lập chỉ mục.
+        if (existingDocument != null) {
+            qdrantService.deleteDocumentChunks(currentUser.getId(), existingDocument.getId());
+            storageService.delete(existingDocument.getStorageUrl());
+            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
+                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
+            }
+            documentRepo.delete(existingDocument);
+        }
+
         updateFolderSizeCascade(folder, safeFileSize(savedDocument));
 
         return buildDocumentResponse(savedDocument);
