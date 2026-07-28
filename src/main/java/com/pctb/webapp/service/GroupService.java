@@ -706,7 +706,8 @@ public class GroupService {
                 .canUpload(isLeader || (member != null && Boolean.TRUE.equals(member.getCanUpload())))
                 .canChat(isLeader || member == null || Boolean.TRUE.equals(member.getCanChat()))
                 .inviteEnabled(group.getInviteEnabled())
-                .inviteLink(isLeader ? buildInviteLink(group.getInviteToken()) : null)
+                // Leader và member dùng chung inviteLink; người được mời vẫn phải nhập đúng mật khẩu.
+                .inviteLink(buildInviteLink(group.getInviteToken()))
                 .memberCount(groupMemberRepo.countByGroupId(group.getId()))
                 .activeFileCount(groupFileRepo.countByGroupIdAndDeletedFalse(group.getId()))
                 .trashFileCount(groupFileRepo.countByGroupIdAndDeletedTrue(group.getId()))
