@@ -62,7 +62,7 @@ import java.util.stream.Collectors;
 @Service
 public class AiChatService {
     private static final String SYSTEM_INSTRUCTION = "Bạn là trợ lý AI trong hệ thống quản lý tài liệu. Trả lời ngắn gọn, rõ ràng, bằng tiếng Việt.";
-    private static final String KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE = "Tôi không tìm thấy thông tin liên quan trong các tài liệu hiện có.";
+    private static final String KNOWLEDGE_ONLY_NO_CONTEXT_MESSAGE = "Xin lỗi, mình chưa tìm thấy thông tin liên quan trong các tài liệu bạn đã tải lên. Bạn có thể thử diễn đạt câu hỏi theo cách khác, sử dụng từ khóa cụ thể hơn hoặc tải lên tài liệu có chứa nội dung cần tìm.";
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final int GEMINI_MAX_RETRIES = 3;
     private static final String AI_BUSY_MESSAGE = "AI hiện đang quá tải,Vui lòng thử lại sau";

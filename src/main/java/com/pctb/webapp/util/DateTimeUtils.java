@@ -35,33 +35,33 @@ public final class DateTimeUtils {
 
         Duration duration = Duration.between(dateTime, nowUtc());
         if (duration.isNegative() || duration.getSeconds() < 5) {
-            return "just now";
+            return "Vừa xong";
         }
 
         long seconds = duration.getSeconds();
         if (seconds < 60) {
-            return seconds + " seconds ago";
+            return seconds + " giây trước";
         }
 
         long minutes = duration.toMinutes();
         if (minutes < 60) {
-            return minutes + " minutes ago";
+            return minutes + " phút trước";
         }
 
         long hours = duration.toHours();
         if (hours < 24) {
-            return hours + " hours ago";
+            return hours + " giờ trước";
         }
 
         long days = duration.toDays();
         if (days < 30) {
-            return days + " days ago";
+            return days + " ngày trước";
         }
 
         if (days < 365) {
-            return days / 30 + " months ago";
+            return days / 30 + " tháng trước";
         }
 
-        return days / 365 + " years ago";
+        return days / 365 + " năm trước";
     }
 }
