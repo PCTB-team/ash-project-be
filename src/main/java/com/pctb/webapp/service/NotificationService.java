@@ -36,7 +36,7 @@ public class NotificationService {
 
     GroupMemberRepo groupMemberRepo;
 
-    // Tao 1 thong bao cho 1 user nhan.
+    // Tạo một thông báo cho một người dùng nhận.
     public void create(
             User receiver,
             User actor,
@@ -71,7 +71,7 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // Gui thong bao cho nhieu thanh vien trong group, co the bo qua actor hoac user khac.
+    // Gửi thông báo cho nhiều thành viên trong nhóm, có thể bỏ qua người thực hiện hoặc người dùng khác.
     public void createForGroupMembers(
             StudyGroup group,
             User actor,
@@ -106,7 +106,7 @@ public class NotificationService {
         }
     }
 
-    // FE goi API nay de lay danh sach thong bao va so luong chua doc.
+    // FE gọi API này để lấy danh sách thông báo và số lượng chưa đọc.
     @Transactional(readOnly = true)
     public NotificationListResponse getMyNotifications(
             Boolean read,
@@ -132,7 +132,7 @@ public class NotificationService {
                 .build();
     }
 
-    // Mark 1, nhieu, hoac tat ca thong bao thanh da doc.
+    // Đánh dấu một, nhiều hoặc tất cả thông báo thành đã đọc.
     @Transactional
     public NotificationListResponse markAsRead(
             MarkNotificationReadRequest request,

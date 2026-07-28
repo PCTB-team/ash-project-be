@@ -201,13 +201,13 @@ public class GroupService {
                 .build();
         groupMemberRepo.save(member);
 
-        // Thong bao cho cac thanh vien cu biet co user moi tham gia group.
+        // Thông báo cho các thành viên cũ biết có người dùng mới tham gia nhóm.
         notificationService.createForGroupMembers(
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_JOINED,
-                "New member joined",
-                currentUser.getFullname() + " joined group \"" + group.getName() + "\".",
+                "Thành viên mới tham gia",
+                currentUser.getFullname() + " đã tham gia nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -235,7 +235,7 @@ public class GroupService {
         StudyGroup group = savedMember.getGroup();
         User targetUser = savedMember.getUser();
 
-        // Bao rieng cho member duoc cap/thu hoi quyen upload.
+        // Thông báo riêng cho thành viên được cấp hoặc thu hồi quyền tải tài liệu lên.
         notificationService.create(
                 targetUser,
                 currentUser,
@@ -243,11 +243,11 @@ public class GroupService {
                         ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
                         : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "You have been granted upload permission"
-                        : "Upload permission has been revoked",
+                        ? "Bạn đã được cấp quyền tải tài liệu lên"
+                        : "Quyền tải tài liệu lên của bạn đã bị thu hồi",
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "The leader allowed you to upload documents to group \"" + group.getName() + "\"."
-                        : "You no longer have permission to upload documents to group \"" + group.getName() + "\".",
+                        ? "Trưởng nhóm đã cho phép bạn tải tài liệu lên nhóm \"" + group.getName() + "\"."
+                        : "Bạn không còn quyền tải tài liệu lên nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -255,7 +255,7 @@ public class GroupService {
                 group.getName()
         );
 
-        // Bao cho cac member con lai de ho thay activity cua group.
+        // Thông báo cho các thành viên còn lại biết hoạt động mới trong nhóm.
         notificationService.createForGroupMembers(
                 group,
                 currentUser,
@@ -263,11 +263,11 @@ public class GroupService {
                         ? NotificationType.GROUP_UPLOAD_PERMISSION_GRANTED
                         : NotificationType.GROUP_UPLOAD_PERMISSION_REVOKED,
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? "Upload permission granted"
-                        : "Upload permission has been revoked",
+                        ? "Đã cấp quyền tải tài liệu lên"
+                        : "Đã thu hồi quyền tải tài liệu lên",
                 Boolean.TRUE.equals(request.getCanUpload())
-                        ? targetUser.getFullname() + " was granted upload permission in group \"" + group.getName() + "\"."
-                        : targetUser.getFullname() + " had upload permission revoked in group \"" + group.getName() + "\".",
+                        ? targetUser.getFullname() + " đã được cấp quyền tải tài liệu lên trong nhóm \"" + group.getName() + "\"."
+                        : targetUser.getFullname() + " đã bị thu hồi quyền tải tài liệu lên trong nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -320,8 +320,8 @@ public class GroupService {
                 kickedUser,
                 currentUser,
                 NotificationType.GROUP_MEMBER_KICKED,
-                "You have been removed from the group",
-                "The leader removed you from group \"" + group.getName() + "\".",
+                "Bạn đã bị xóa khỏi nhóm",
+                "Trưởng nhóm đã xóa bạn khỏi nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -329,13 +329,13 @@ public class GroupService {
                 group.getName()
         );
 
-        // Bao cho cac member con lai biet user nay da bi kick khoi group.
+        // Thông báo cho các thành viên còn lại biết người dùng này đã bị xóa khỏi nhóm.
         notificationService.createForGroupMembers(
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_KICKED,
-                "Member removed from the group",
-                kickedUser.getFullname() + " was removed from group \"" + group.getName() + "\".",
+                "Thành viên đã bị xóa khỏi nhóm",
+                kickedUser.getFullname() + " đã bị xóa khỏi nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -367,13 +367,13 @@ public class GroupService {
         member.setCanUpload(false);
         StudyGroup group = member.getGroup();
 
-        // Bao cho cac thanh vien con lai biet user nay da roi group.
+        // Thông báo cho các thành viên còn lại biết người dùng này đã rời nhóm.
         notificationService.createForGroupMembers(
                 group,
                 currentUser,
                 NotificationType.GROUP_MEMBER_LEFT,
-                "Member left the group",
-                currentUser.getFullname() + " left group \"" + group.getName() + "\".",
+                "Thành viên đã rời nhóm",
+                currentUser.getFullname() + " đã rời nhóm \"" + group.getName() + "\".",
                 NotificationType.GROUP,
                 group.getId(),
                 group.getName(),
@@ -417,14 +417,14 @@ public class GroupService {
                 .distinct()
                 .toList();
 
-        // Tạo thông báo trước khi xóa membership để lấy được đầy đủ danh sách member.
-        // Leader bị loại khỏi danh sách nhận vì chính leader là người thực hiện thao tác.
+        // Tạo thông báo trước khi xóa thành viên để lấy được đầy đủ danh sách người nhận.
+        // Trưởng nhóm không nhận thông báo vì chính họ là người thực hiện thao tác.
         notificationService.createForGroupMembers(
                 group,
                 currentUser,
                 NotificationType.GROUP_DELETED,
-                "Group deleted",
-                "Group \"" + deletedGroupName + "\" was deleted by the leader.",
+                "Nhóm đã bị xóa",
+                "Nhóm \"" + deletedGroupName + "\" đã bị trưởng nhóm xóa.",
                 NotificationType.GROUP,
                 deletedGroupId,
                 deletedGroupName,
@@ -502,8 +502,8 @@ public class GroupService {
                 savedGroup,
                 currentUser,
                 NotificationType.GROUP_PASSWORD_CHANGED,
-                "Group password changed",
-                "The password for group \"" + savedGroup.getName() + "\" has been updated.",
+                "Mật khẩu nhóm đã thay đổi",
+                "Mật khẩu của nhóm \"" + savedGroup.getName() + "\" đã được cập nhật.",
                 NotificationType.GROUP,
                 savedGroup.getId(),
                 savedGroup.getName(),
