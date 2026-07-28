@@ -248,39 +248,7 @@ Gợi ý filter UI:
 - Tabs: `Tất cả`, `Admin action`, `User action`, `Document log`
 - Toggle: `Chỉ của tôi`
 
-## 6. AI Statistics
-
-Endpoint:
-
-```http
-GET /admin/ai/statistics
-```
-
-Backend đã bỏ dữ liệu hard-code và lấy từ `AiChatHistory`.
-
-FE map:
-
-- `totalAiMessagesThisMonth`
-- `topAiUserMessageCount`
-- `knowledgeChatRatio`
-- `totalSummarizedDocs`
-- `aiUsageTrendByDay`
-
-`aiUsageTrendByDay` là map theo ngày:
-
-```json
-{
-  "Monday": 0,
-  "Tuesday": 2,
-  "Wednesday": 0,
-  "Thursday": 0,
-  "Friday": 0,
-  "Saturday": 0,
-  "Sunday": 0
-}
-```
-
-## 7. Ghi chú kiểm tra nhanh cho FE
+## 6. Ghi chú kiểm tra nhanh cho FE
 
 Sau khi sửa FE, test các case sau:
 
@@ -289,4 +257,3 @@ Sau khi sửa FE, test các case sau:
 3. Trang nhóm không còn hiện `1.2`; dùng số nguyên hoặc đổi sang `Tổng thành viên`.
 4. Trang thanh toán chart doanh thu có đủ 6 tháng, tháng không có giao dịch là 0.
 5. Sidebar có `Nhật ký Admin`, gọi `currentAdminOnly=true` để admin xem lại thao tác của mình.
-6. AI statistics không còn số mẫu cố định.
