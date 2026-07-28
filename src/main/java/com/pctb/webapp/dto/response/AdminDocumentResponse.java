@@ -1,7 +1,9 @@
 package com.pctb.webapp.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -14,8 +16,9 @@ public class AdminDocumentResponse {
     String fileName;
     String fileExtension;
     Long fileSize;
-    String ownerUsername; // Tên tài khoản sinh viên sở hữu tài liệu
-    String ownerEmail;    // Email của sinh viên
-    boolean deleted;       // Trạng thái đã xóa mềm hay chưa (nằm trong thùng rác)
+    String ownerUsername;
+    String ownerEmail;
+    @JsonIgnore
+    boolean deleted;
     LocalDateTime createdAt;
 }

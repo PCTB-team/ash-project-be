@@ -33,7 +33,7 @@ public class DashboardStatsResponse {
     long pendingReports;
 
     // 📈 DỮ LIỆU ĐỒ THỊ CHUYÊN SÂU THEO THỜI GIAN (Dành cho LineChart & AreaChart của FE)
-    List<MonthlyStatItem> monthlyUserGrowth; // Mảng 6 tháng gần nhất vẽ Line Chart
+    List<MonthlyStatItem> monthlyUserGrowth; // Mảng 12 tháng gần nhất vẽ Line Chart
     List<MonthlyStatItem> monthlyRevenueTrend; // Mảng 6 tháng gần nhất vẽ Area Chart
 
     List<WeeklyStatItem> weeklyUploadTrend;

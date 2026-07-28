@@ -11,5 +11,6 @@ import lombok.experimental.FieldDefaults;
 public class AdminGroupStatsResponse {
     long totalGroups;
     long activeGroupsLast7Days;
+    long totalMembers;
     double averageMembersPerGroup;
 }

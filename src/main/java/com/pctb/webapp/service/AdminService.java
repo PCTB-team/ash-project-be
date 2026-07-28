@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,6 +42,7 @@ public class AdminService {
     StoragePlanRepo storagePlanRepo;
     UserLoginHistoryRepo userLoginHistoryRepo;
     SystemLogRepo systemLogRepo;
+    AiChatHistoryRepo aiChatHistoryRepo;
     LogService logService;
     UserMapper userMapper;
     RedisService redisService;
@@ -57,6 +59,9 @@ public class AdminService {
     public DashboardStatsResponse getDashboardStats() {
         List<User> allUsers = userRepo.findAll();
         List<Document> allDocs = documentRepo.findAll();
+        List<Document> activeDocs = allDocs.stream()
+                .filter(document -> !Boolean.TRUE.equals(document.getDeleted()))
+                .collect(Collectors.toList());
         List<com.pctb.webapp.entity.Transaction> allTransactions = transactionRepo.findAll().stream()
                 .filter(tx -> tx.getStatus() != null && "SUCCESS".equalsIgnoreCase(tx.getStatus().name()))
                 .collect(Collectors.toList());
@@ -65,7 +70,7 @@ public class AdminService {
 
         // 1. Dữ liệu nạp Stat Cards hàng trên
         long totalUsers = allUsers.size();
-        long totalDocuments = allDocs.size();
+        long totalDocuments = activeDocs.size();
         long totalGroups = studyGroupRepo.count();
 
         double totalRevenue = 0;
@@ -79,7 +84,7 @@ public class AdminService {
                         && user.getCreatedAt().getYear() == currentYear)
                 .count();
 
-        long newDocsThisMonth = allDocs.stream()
+        long newDocsThisMonth = activeDocs.stream()
                 .filter(document -> document.getCreatedAt() != null
                         && document.getCreatedAt().getMonthValue() == currentMonth
                         && document.getCreatedAt().getYear() == currentYear)
@@ -98,7 +103,7 @@ public class AdminService {
                 .map(log -> log.getUser() != null ? log.getUser().getId() : null)
                 .filter(Objects::nonNull).distinct().count();
 
-        long totalStorageUsedBytes = allDocs.stream().mapToLong(d -> d.getFileSize() != null ? d.getFileSize() : 0L).sum();
+        long totalStorageUsedBytes = activeDocs.stream().mapToLong(d -> d.getFileSize() != null ? d.getFileSize() : 0L).sum();
         long totalStorageCapacityBytes = 10995116277760L; // Dung lượng trần 10TB hệ thống
 
         // 2. Phân bố hệ hạ tầng hình bánh Donut Chart
@@ -109,7 +114,7 @@ public class AdminService {
         fileTypeDistribution.put("VIDEO", 0L);
         fileTypeDistribution.put("OTHER", 0L);
 
-        for (Document d : allDocs) {
+        for (Document d : activeDocs) {
             String ext = d.getFileExtension() != null ? d.getFileExtension().toUpperCase().trim() : "OTHER";
             if (List.of("PDF", "DOC", "DOCX", "TXT", "XLSX").contains(ext)) {
                 fileTypeDistribution.put("PDF", fileTypeDistribution.get("PDF") + 1);
@@ -124,32 +129,43 @@ public class AdminService {
             }
         }
 
-        // 3. Logic xử lý mảng dòng thời gian 6 tháng vẽ Line & Area Chart
+        // 3. Logic xử lý mảng dòng thời gian vẽ Line & Area Chart
         List<MonthlyStatItem> userGrowthTrend = new ArrayList<>();
         List<MonthlyStatItem> revenueTrend = new ArrayList<>();
 
-        for (int i = 5; i >= 0; i--) {
+        for (int i = 11; i >= 0; i--) {
             LocalDateTime targetMonth = now.minusMonths(i);
-            String label = "Month " + targetMonth.getMonthValue();
+            String label = targetMonth.format(DateTimeFormatter.ofPattern("MM/yyyy"));
 
             long usersInMonth = allUsers.stream().filter(u -> u.getCreatedAt() != null
                     && u.getCreatedAt().getMonthValue() == targetMonth.getMonthValue()
                     && u.getCreatedAt().getYear() == targetMonth.getYear()).count();
-            userGrowthTrend.add(new MonthlyStatItem(label, (double) usersInMonth));
+            userGrowthTrend.add(MonthlyStatItem.users(label, (double) usersInMonth));
+        }
+
+        for (int i = 5; i >= 0; i--) {
+            LocalDateTime targetMonth = now.minusMonths(i);
+            String label = targetMonth.format(DateTimeFormatter.ofPattern("MM/yyyy"));
 
             double revInMonth = allTransactions.stream().filter(tx -> tx.getCreatedAt() != null
                             && tx.getCreatedAt().getMonthValue() == targetMonth.getMonthValue()
                             && tx.getCreatedAt().getYear() == targetMonth.getYear())
                     .mapToDouble(tx -> tx.getAmount() != null ? tx.getAmount().doubleValue() : 0.0).sum();
-            revenueTrend.add(new MonthlyStatItem(label, revInMonth));
+            revenueTrend.add(MonthlyStatItem.revenue(label, revInMonth));
         }
 
-        // 4. ĐỒNG BỘ: Tạo dữ liệu ảo xu hướng upload theo tuần (Weekly Bar Chart)
+        // 4. ĐỒNG BỘ: Tạo xu hướng upload thật theo 4 tuần gần nhất (Weekly Bar Chart)
         List<WeeklyStatItem> weeklyUploadTrend = new ArrayList<>();
-        weeklyUploadTrend.add(new WeeklyStatItem("Week 1", totalDocuments / 4 + 2));
-        weeklyUploadTrend.add(new WeeklyStatItem("Week 2", totalDocuments / 4 - 1));
-        weeklyUploadTrend.add(new WeeklyStatItem("Week 3", totalDocuments / 4 + 5));
-        weeklyUploadTrend.add(new WeeklyStatItem("Week 4", totalDocuments / 4));
+        for (int i = 3; i >= 0; i--) {
+            LocalDateTime weekStart = now.toLocalDate().minusWeeks(i).atStartOfDay();
+            LocalDateTime weekEnd = weekStart.plusWeeks(1);
+            long uploads = activeDocs.stream()
+                    .filter(document -> document.getCreatedAt() != null)
+                    .filter(document -> !document.getCreatedAt().isBefore(weekStart)
+                            && document.getCreatedAt().isBefore(weekEnd))
+                    .count();
+            weeklyUploadTrend.add(new WeeklyStatItem("Week " + (4 - i), uploads));
+        }
 
         // 5. ĐỒNG BỘ: Ánh xạ bảng "Hoạt động gần đây" đón tiếp cấu trúc RecentActivityResponse
         List<SystemLog> logs = systemLogRepo.findAll();
@@ -180,15 +196,30 @@ public class AdminService {
     }
 
     public Page<SystemLog> getSystemAuditLogsPaged(int page, int size, String logType) {
+        return getSystemAuditLogsPaged(page, size, logType, null);
+    }
+
+    public Page<SystemLog> getSystemAuditLogsPaged(int page, int size, String logType, String actor) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        if (logType == null || logType.isBlank()) {
+        boolean hasLogType = logType != null && !logType.isBlank();
+        boolean hasActor = actor != null && !actor.isBlank();
+        if (!hasLogType && !hasActor) {
             return systemLogRepo.findAll(pageable);
         }
         List<SystemLog> filteredLogs = systemLogRepo.findAll().stream()
-                .filter(log -> matchesLogType(log, logType))
+                .filter(log -> !hasLogType || matchesLogType(log, logType))
+                .filter(log -> !hasActor || matchesActor(log, actor))
                 .sorted(Comparator.comparing(SystemLog::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toList());
         return createPageFromList(filteredLogs, pageable);
+    }
+
+    private boolean matchesActor(SystemLog log, String actor) {
+        if (log == null || actor == null || actor.isBlank()) {
+            return true;
+        }
+        String cleanActor = actor.trim();
+        return log.getActor() != null && log.getActor().equalsIgnoreCase(cleanActor);
     }
 
     private boolean matchesLogType(SystemLog log, String logType) {
@@ -510,11 +541,12 @@ public class AdminService {
         long totalMembers = groups.stream()
                 .mapToLong(group -> groupMemberRepo.countByGroupId(group.getId()))
                 .sum();
-        double averageMembersPerGroup = groups.isEmpty() ? 0.0 : (double) totalMembers / groups.size();
+        double averageMembersPerGroup = groups.isEmpty() ? 0.0 : Math.round((double) totalMembers / groups.size());
 
         return AdminGroupStatsResponse.builder()
                 .totalGroups(groups.size())
                 .activeGroupsLast7Days(activeGroupsLast7Days)
+                .totalMembers(totalMembers)
                 .averageMembersPerGroup(averageMembersPerGroup)
                 .build();
     }
@@ -667,6 +699,7 @@ public class AdminService {
             bucket[0] += amount;
             bucket[1] += 1;
         }
+        fillRevenueBuckets(groupedRevenue, normalizedGranularity, resolvedFrom, resolvedTo);
 
         List<AdminRevenueStatItem> series = groupedRevenue.entrySet().stream()
                 .map(entry -> AdminRevenueStatItem.builder()
@@ -714,10 +747,27 @@ public class AdminService {
     private LocalDateTime defaultRevenueFrom(String granularity, LocalDateTime to) {
         return switch (granularity) {
             case "HOUR" -> to.minusHours(24);
-            case "MONTH" -> to.minusMonths(12);
+            case "MONTH" -> YearMonth.from(to).minusMonths(5).atDay(1).atStartOfDay();
             case "YEAR" -> to.minusYears(5);
             default -> to.minusDays(30);
         };
+    }
+
+    private void fillRevenueBuckets(
+            Map<String, long[]> groupedRevenue,
+            String granularity,
+            LocalDateTime from,
+            LocalDateTime to
+    ) {
+        if (!"MONTH".equals(granularity)) {
+            return;
+        }
+        YearMonth month = YearMonth.from(from);
+        YearMonth lastMonth = YearMonth.from(to);
+        while (!month.isAfter(lastMonth)) {
+            groupedRevenue.putIfAbsent(month.format(DateTimeFormatter.ofPattern("yyyy-MM")), new long[2]);
+            month = month.plusMonths(1);
+        }
     }
 
     private String formatRevenueLabel(LocalDateTime createdAt, String granularity) {
@@ -842,20 +892,62 @@ public class AdminService {
     // 🤖 TRANG 6: THỐNG KÊ CHI TIẾT AI CHATBOT (RAG Semantic Analytics)
     // =========================================================================
     public AdminAiStatsResponse getAiStatistics() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime monthStart = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+        List<AiChatHistory> allHistory = aiChatHistoryRepo.findAll();
+        List<AiChatHistory> historyThisMonth = allHistory.stream()
+                .filter(history -> history.getCreatedAt() != null)
+                .filter(history -> !history.getCreatedAt().isBefore(monthStart)
+                        && !history.getCreatedAt().isAfter(now))
+                .collect(Collectors.toList());
+
+        long totalAiMessagesThisMonth = historyThisMonth.size();
+        long topAiUserMessageCount = historyThisMonth.stream()
+                .filter(history -> history.getUser() != null)
+                .collect(Collectors.groupingBy(
+                        history -> history.getUser().getId(),
+                        Collectors.counting()
+                ))
+                .values()
+                .stream()
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L);
+
+        long knowledgeChats = historyThisMonth.stream()
+                .filter(history -> "DOCUMENT".equalsIgnoreCase(history.getAnswerSource()))
+                .count();
+        double knowledgeChatRatio = totalAiMessagesThisMonth == 0
+                ? 0
+                : Math.round(knowledgeChats * 1000.0 / totalAiMessagesThisMonth) / 10.0;
+
+        long totalSummarizedDocs = allHistory.stream()
+                .map(AiChatHistory::getDocumentId)
+                .filter(documentId -> documentId != null && !documentId.isBlank())
+                .distinct()
+                .count();
+
+        LocalDateTime weekStart = now.toLocalDate()
+                .minusDays(now.getDayOfWeek().getValue() - 1L)
+                .atStartOfDay();
+        String[] dayLabels = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
         Map<String, Long> trendMap = new LinkedHashMap<>();
-        trendMap.put("Monday", 145L);
-        trendMap.put("Tuesday", 190L);
-        trendMap.put("Wednesday", 225L);
-        trendMap.put("Thursday", 210L);
-        trendMap.put("Friday", 265L);
-        trendMap.put("Saturday", 340L);
-        trendMap.put("Sunday", 295L);
+        for (int i = 0; i < dayLabels.length; i++) {
+            LocalDateTime dayStart = weekStart.plusDays(i);
+            LocalDateTime dayEnd = dayStart.plusDays(1);
+            long messages = allHistory.stream()
+                    .filter(history -> history.getCreatedAt() != null)
+                    .filter(history -> !history.getCreatedAt().isBefore(dayStart)
+                            && history.getCreatedAt().isBefore(dayEnd))
+                    .count();
+            trendMap.put(dayLabels[i], messages);
+        }
 
         return AdminAiStatsResponse.builder()
-                .totalAiMessagesThisMonth(5420L)
-                .topAiUserMessageCount(380L)
-                .knowledgeChatRatio(78.2) // 78.2% câu hỏi bám sát tài liệu cá nhân (RAG)
-                .totalSummarizedDocs(168L) // 168 file PDF đã được AI đọc tóm tắt hộ sinh viên
+                .totalAiMessagesThisMonth(totalAiMessagesThisMonth)
+                .topAiUserMessageCount(topAiUserMessageCount)
+                .knowledgeChatRatio(knowledgeChatRatio)
+                .totalSummarizedDocs(totalSummarizedDocs)
                 .aiUsageTrendByDay(trendMap)
                 .build();
     }
