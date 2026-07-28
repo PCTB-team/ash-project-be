@@ -42,7 +42,6 @@ public class AdminService {
     StoragePlanRepo storagePlanRepo;
     UserLoginHistoryRepo userLoginHistoryRepo;
     SystemLogRepo systemLogRepo;
-    AiChatHistoryRepo aiChatHistoryRepo;
     LogService logService;
     UserMapper userMapper;
     RedisService redisService;
@@ -886,70 +885,6 @@ public class AdminService {
 
     private String planFeaturesKey(String planId) {
         return ADMIN_PLAN_FEATURES_PREFIX + planId;
-    }
-
-    // =========================================================================
-    // 🤖 TRANG 6: THỐNG KÊ CHI TIẾT AI CHATBOT (RAG Semantic Analytics)
-    // =========================================================================
-    public AdminAiStatsResponse getAiStatistics() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime monthStart = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
-        List<AiChatHistory> allHistory = aiChatHistoryRepo.findAll();
-        List<AiChatHistory> historyThisMonth = allHistory.stream()
-                .filter(history -> history.getCreatedAt() != null)
-                .filter(history -> !history.getCreatedAt().isBefore(monthStart)
-                        && !history.getCreatedAt().isAfter(now))
-                .collect(Collectors.toList());
-
-        long totalAiMessagesThisMonth = historyThisMonth.size();
-        long topAiUserMessageCount = historyThisMonth.stream()
-                .filter(history -> history.getUser() != null)
-                .collect(Collectors.groupingBy(
-                        history -> history.getUser().getId(),
-                        Collectors.counting()
-                ))
-                .values()
-                .stream()
-                .mapToLong(Long::longValue)
-                .max()
-                .orElse(0L);
-
-        long knowledgeChats = historyThisMonth.stream()
-                .filter(history -> "DOCUMENT".equalsIgnoreCase(history.getAnswerSource()))
-                .count();
-        double knowledgeChatRatio = totalAiMessagesThisMonth == 0
-                ? 0
-                : Math.round(knowledgeChats * 1000.0 / totalAiMessagesThisMonth) / 10.0;
-
-        long totalSummarizedDocs = allHistory.stream()
-                .map(AiChatHistory::getDocumentId)
-                .filter(documentId -> documentId != null && !documentId.isBlank())
-                .distinct()
-                .count();
-
-        LocalDateTime weekStart = now.toLocalDate()
-                .minusDays(now.getDayOfWeek().getValue() - 1L)
-                .atStartOfDay();
-        String[] dayLabels = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
-        Map<String, Long> trendMap = new LinkedHashMap<>();
-        for (int i = 0; i < dayLabels.length; i++) {
-            LocalDateTime dayStart = weekStart.plusDays(i);
-            LocalDateTime dayEnd = dayStart.plusDays(1);
-            long messages = allHistory.stream()
-                    .filter(history -> history.getCreatedAt() != null)
-                    .filter(history -> !history.getCreatedAt().isBefore(dayStart)
-                            && history.getCreatedAt().isBefore(dayEnd))
-                    .count();
-            trendMap.put(dayLabels[i], messages);
-        }
-
-        return AdminAiStatsResponse.builder()
-                .totalAiMessagesThisMonth(totalAiMessagesThisMonth)
-                .topAiUserMessageCount(topAiUserMessageCount)
-                .knowledgeChatRatio(knowledgeChatRatio)
-                .totalSummarizedDocs(totalSummarizedDocs)
-                .aiUsageTrendByDay(trendMap)
-                .build();
     }
 
     // =========================================================================

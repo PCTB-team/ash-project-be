@@ -304,17 +304,6 @@ public class AdminController {
     }
 
     // ==========================================
-    // 🤖 6. TRANG 6: THỐNG KÊ AI (AI STATS)
-    // ==========================================
-    @Operation(summary = "Page 6: Get AI chatbot usage statistics and charts")
-    @GetMapping("/ai/statistics")
-    public ApiResponse<AdminAiStatsResponse> getAiStats() {
-        return ApiResponse.<AdminAiStatsResponse>builder()
-                .result(adminService.getAiStatistics())
-                .build();
-    }
-
-    // ==========================================
     // ⚙️ 7. TRANG 7: CÀI ĐẶT HỆ THỐNG
     // ==========================================
     @Operation(summary = "Page 7: Get administrative system settings")
