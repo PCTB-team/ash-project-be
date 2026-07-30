@@ -36,6 +36,8 @@ public class FolderService {
 
     DocumentIndexingService documentIndexingService;
 
+    DocumentTextExtractorService documentTextExtractorService;
+
     // Tạo folder mới cho user hiện tại, có thể nằm ở root hoặc nằm trong một folder cha hợp lệ.
     @Transactional
     // Lưu folder mới trong transaction để tránh tạo trùng hoặc lưu thiếu dữ liệu owner/parent.
@@ -163,7 +165,9 @@ public class FolderService {
             document.setDeletedAt(null);
             document.setUpdatedAt(restoredAt);
             documentRepo.save(document);
-            documentIndexingService.indexDocument(document.getId());
+            if (documentTextExtractorService.supportsIndexing(document.getFileName())) {
+                documentIndexingService.indexDocument(document.getId());
+            }
         }
 
         List<Folder> childFolders = folderRepo.findByOwnerIdAndParentId(userId, folder.getId());
