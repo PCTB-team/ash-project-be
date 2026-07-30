@@ -61,6 +61,7 @@ public class AuthenService {
     RedisService redisService;
     ObjectMapper objectMapper;
     MailService mailService;
+    LogService logService;
 
     @Value("${google.client-id}")
     @NonFinal
@@ -172,6 +173,7 @@ public class AuthenService {
 
         // Lưu refresh token xuống redis với tgian là refreshTokenValidSeconds
         redisService.setWithTtl(refreshTokenKey(user.getId()), refreshToken, refreshTokenValidSeconds);
+        logAdminAuthentication(user, LogService.ACTION_ADMIN_LOGIN, "Admin " + user.getUsername() + " logged in");
 
         return LoginResponse.builder()
                 .accessToken(accessToken)
@@ -281,6 +283,9 @@ public class AuthenService {
         }
         // Xóa refresh token
         redisService.delete(key);
+        userRepo.findById(accessUserId)
+                .ifPresent(user -> logAdminAuthentication(user, LogService.ACTION_ADMIN_LOGOUT,
+                        "Admin " + user.getUsername() + " logged out"));
 
         return LogoutResponse.builder()
                 .loggedOut(true)
@@ -678,6 +683,7 @@ public class AuthenService {
         String refreshToken = generateToken(user, refreshTokenValidSeconds, "refresh");
 
         redisService.setWithTtl(refreshTokenKey(user.getId()), refreshToken, refreshTokenValidSeconds);
+        logAdminAuthentication(user, LogService.ACTION_ADMIN_LOGIN, "Admin " + user.getUsername() + " logged in with Google");
 
         return LoginResponse.builder()
                 .accessToken(accessToken)
@@ -702,5 +708,9 @@ public class AuthenService {
         return user.getLockedAt() != null
                 || user.getLockedReason() != null
                 || user.getLockedByAdmin() != null;
+    }
+
+    private void logAdminAuthentication(User user, String action, String details) {
+        logService.logAdminAction(user, LogService.SYSTEM_MANAGEMENT, action, user.getId(), details);
     }
 }

@@ -52,7 +52,7 @@ public class AdminController {
             @RequestParam(defaultValue = "false") boolean currentAdminOnly,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String resolvedActor = currentAdminOnly && jwt != null ? jwt.getClaimAsString("sub") : actor;
+        String resolvedActor = currentAdminOnly && jwt != null ? currentActorId(jwt) : actor;
         return ApiResponse.<Page<SystemLog>>builder()
                 .result(adminService.getSystemAuditLogsPaged(page, size, logType, resolvedActor))
                 .build();
@@ -90,8 +90,7 @@ public class AdminController {
             @RequestParam String roleName,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.updateUserRole(userId, roleName, adminName);
+        adminService.updateUserRole(userId, roleName, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("User privilege updated successfully")
                 .result("UPDATED")
@@ -105,10 +104,9 @@ public class AdminController {
             @RequestBody AdminSetUserStoragePlanRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
         return ApiResponse.<UserResponse>builder()
                 .message("User storage plan updated successfully")
-                .result(adminService.setUserStoragePlan(userId, request, adminName))
+                .result(adminService.setUserStoragePlan(userId, request, currentActorId(jwt)))
                 .build();
     }
 
@@ -119,8 +117,7 @@ public class AdminController {
             @Valid @RequestBody LockUserRequest lockRequest,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.updateUserStatus(userId, false, lockRequest.getReason(), adminName);
+        adminService.updateUserStatus(userId, false, lockRequest.getReason(), currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("User account banned successfully")
                 .result("BANNED")
@@ -130,8 +127,7 @@ public class AdminController {
     @Operation(summary = "Page 2: Unlock a user account")
     @PutMapping("/users/{userId}/unlock")
     public ApiResponse<String> unlockUser(@PathVariable String userId, @AuthenticationPrincipal Jwt jwt) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.updateUserStatus(userId, true, null, adminName);
+        adminService.updateUserStatus(userId, true, null, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("User account unlocked successfully")
                 .result("ACTIVE")
@@ -141,8 +137,7 @@ public class AdminController {
     @Operation(summary = "Page 2: Permanently delete a violating user account")
     @DeleteMapping("/users/{userId}")
     public ApiResponse<String> deleteUser(@PathVariable String userId, @AuthenticationPrincipal Jwt jwt) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.deleteUserAccount(userId, adminName);
+        adminService.deleteUserAccount(userId, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("User record permanently purged from database")
                 .result("DELETED")
@@ -168,8 +163,7 @@ public class AdminController {
     @Operation(summary = "Page 3: Move a policy-violating document to system trash")
     @DeleteMapping("/documents/{docId}")
     public ApiResponse<String> deleteDocument(@PathVariable String docId, @AuthenticationPrincipal Jwt jwt) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.softDeleteDocument(docId, adminName);
+        adminService.softDeleteDocument(docId, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("Document moved to system trash successfully")
                 .result("MOVED_TO_TRASH")
@@ -222,8 +216,7 @@ public class AdminController {
             @RequestBody AdminUpdateGroupStatusRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        String status = adminService.updateGroupStatus(groupId, request, adminName);
+        String status = adminService.updateGroupStatus(groupId, request, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("Study group status updated successfully")
                 .result(status)
@@ -234,8 +227,7 @@ public class AdminController {
     @Operation(summary = "Page 4: Permanently delete a policy-violating study group")
     @DeleteMapping("/groups/{groupId}")
     public ApiResponse<String> deleteGroup(@PathVariable String groupId, @AuthenticationPrincipal Jwt jwt) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
-        adminService.deleteGroup(groupId, adminName);
+        adminService.deleteGroup(groupId, currentActorId(jwt));
         return ApiResponse.<String>builder()
                 .message("Study group dismantled successfully")
                 .result("GROUP_DELETED")
@@ -296,10 +288,9 @@ public class AdminController {
             @RequestBody AdminUpdatePlanRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
         return ApiResponse.<AdminPlanResponse>builder()
                 .message("Storage plan updated successfully")
-                .result(adminService.updatePlan(planId, request, adminName))
+                .result(adminService.updatePlan(planId, request, currentActorId(jwt)))
                 .build();
     }
 
@@ -320,10 +311,9 @@ public class AdminController {
             @RequestBody AdminUpdateSettingsRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
         return ApiResponse.<SystemSettingsResponse>builder()
                 .message("System settings updated successfully")
-                .result(adminService.updateSystemSettings(request, adminName))
+                .result(adminService.updateSystemSettings(request, currentActorId(jwt)))
                 .build();
     }
 
@@ -342,10 +332,13 @@ public class AdminController {
             @RequestBody AdminUpdateHomepageConfigRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String adminName = jwt != null ? jwt.getClaimAsString("sub") : "SystemAdmin";
         return ApiResponse.<HomepageConfigResponse>builder()
                 .message("Homepage configuration updated successfully")
-                .result(adminService.updateHomepageConfig(request, adminName))
+                .result(adminService.updateHomepageConfig(request, currentActorId(jwt)))
                 .build();
+    }
+
+    private String currentActorId(Jwt jwt) {
+        return jwt != null ? jwt.getSubject() : null;
     }
 }

@@ -213,3 +213,6 @@ nbdist/
 
 # Local environment runner with secrets
 start.ps1
+
+# Local IntelliJ inspections are developer-specific.
+.idea/inspectionProfiles/

@@ -199,70 +199,75 @@ public class AdminService {
         return getSystemAuditLogsPaged(page, size, logType, null);
     }
 
-    public Page<SystemLog> getSystemAuditLogsPaged(int page, int size, String logType, String actor) {
+    public Page<SystemLog> getSystemAuditLogsPaged(int page, int size, String logType, String actorId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         boolean hasLogType = logType != null && !logType.isBlank();
-        boolean hasActor = actor != null && !actor.isBlank();
+        boolean hasActor = actorId != null && !actorId.isBlank();
+        String normalizedLogType = normalizeLogType(logType);
+        String cleanActorId = hasActor ? actorId.trim() : null;
+
+        if ("ADMIN".equals(normalizedLogType)) {
+            return hasActor
+                    ? systemLogRepo.findAdminAuditLogsByActorId(cleanActorId, pageable)
+                    : systemLogRepo.findAdminAuditLogs(pageable);
+        }
         if (!hasLogType && !hasActor) {
             return systemLogRepo.findAll(pageable);
         }
         List<SystemLog> filteredLogs = systemLogRepo.findAll().stream()
-                .filter(log -> !hasLogType || matchesLogType(log, logType))
-                .filter(log -> !hasActor || matchesActor(log, actor))
+                .filter(log -> !hasLogType || matchesLogType(log, normalizedLogType))
+                .filter(log -> !hasActor || matchesActor(log, cleanActorId))
                 .sorted(Comparator.comparing(SystemLog::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toList());
         return createPageFromList(filteredLogs, pageable);
     }
 
-    private boolean matchesActor(SystemLog log, String actor) {
-        if (log == null || actor == null || actor.isBlank()) {
+    private boolean matchesActor(SystemLog log, String actorId) {
+        if (log == null || actorId == null || actorId.isBlank()) {
             return true;
         }
-        String cleanActor = actor.trim();
-        return log.getActor() != null && log.getActor().equalsIgnoreCase(cleanActor);
+        String cleanActorId = actorId.trim();
+        return (log.getActorId() != null && log.getActorId().equals(cleanActorId))
+                || (log.getActor() != null && log.getActor().equalsIgnoreCase(cleanActorId));
     }
 
     private boolean matchesLogType(SystemLog log, String logType) {
         String cleanLogType = normalizeLogType(logType);
         String actorType = log.getActorType() != null ? normalizeLogType(log.getActorType()) : "";
-        String action = log.getAction() != null ? log.getAction().toUpperCase() : "";
 
-        if ("DOCUMENT_LOG".equals(cleanLogType)) {
-            return "DOCUMENT_LOG".equals(actorType) || action.contains("DOC") || action.contains("DOCUMENT");
+        if ("DOCUMENT".equals(cleanLogType)) {
+            return "DOCUMENT".equals(actorType);
         }
-        if ("ADMIN_ACTION".equals(cleanLogType)) {
-            return "ADMIN_ACTION".equals(actorType)
-                    || action.contains("ADMIN")
-                    || action.contains("ROLE")
-                    || action.contains("USER")
-                    || action.contains("GROUP")
-                    || action.contains("BAN")
-                    || action.contains("UNLOCK")
-                    || action.contains("DELETE");
+        if ("ADMIN".equals(cleanLogType)) {
+            return "ADMIN".equals(actorType) && isAdminAuditActionGroup(log.getActionGroup());
         }
-        if ("USER_ACTION".equals(cleanLogType)) {
-            return "USER_ACTION".equals(actorType)
-                    || action.contains("USER")
-                    || action.contains("ROLE")
-                    || action.contains("BAN")
-                    || action.contains("UNLOCK")
-                    || (!matchesLogType(log, "ADMIN_ACTION") && !matchesLogType(log, "DOCUMENT_LOG"));
+        if ("USER".equals(cleanLogType)) {
+            return "USER".equals(actorType);
         }
         return true;
     }
 
     private String normalizeLogType(String logType) {
         String cleanLogType = logType == null ? "" : logType.trim().toUpperCase();
-        if ("USER".equals(cleanLogType) || "USER_LOG".equals(cleanLogType)) {
-            return "USER_ACTION";
+        if ("USER_ACTION".equals(cleanLogType) || "USER_LOG".equals(cleanLogType)) {
+            return "USER";
         }
-        if ("DOCUMENT".equals(cleanLogType) || "DOCUMENT_ACTION".equals(cleanLogType)) {
-            return "DOCUMENT_LOG";
+        if ("DOCUMENT_ACTION".equals(cleanLogType) || "DOCUMENT_LOG".equals(cleanLogType)) {
+            return "DOCUMENT";
         }
-        if ("ADMIN".equals(cleanLogType) || "ADMIN_LOG".equals(cleanLogType)) {
-            return "ADMIN_ACTION";
+        if ("ADMIN_ACTION".equals(cleanLogType) || "ADMIN_LOG".equals(cleanLogType)) {
+            return "ADMIN";
         }
         return cleanLogType;
+    }
+
+    private boolean isAdminAuditActionGroup(String actionGroup) {
+        return List.of(
+                LogService.USER_MANAGEMENT,
+                LogService.DOCUMENT_MANAGEMENT,
+                LogService.GROUP_MANAGEMENT,
+                LogService.SYSTEM_MANAGEMENT
+        ).contains(actionGroup);
     }
 
     // =========================================================================
@@ -327,7 +332,9 @@ public class AdminService {
     }
 
     @Transactional
-    public void updateUserRole(String userId, String newRoleName, String adminName) {
+    public void updateUserRole(String userId, String newRoleName, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         Role role = roleRepo.findById(newRoleName.trim().toUpperCase())
@@ -337,12 +344,14 @@ public class AdminService {
         user.setRoles(newRoles);
         userRepo.save(user);
 
-        logService.log(adminName, "USER_ACTION", "UPDATE_ROLE", user.getId(),
+        logService.logAdminAction(admin, LogService.USER_MANAGEMENT, LogService.ACTION_UPDATE_ROLE, user.getId(),
                 "Admin " + adminName + " updated account privileges for [" + user.getUsername() + "] to " + newRoleName.toUpperCase());
     }
 
     @Transactional
-    public void updateUserStatus(String userId, boolean active, String reason, String adminName) {
+    public void updateUserStatus(String userId, boolean active, String reason, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setAccountNonLocked(active);
@@ -358,14 +367,16 @@ public class AdminService {
         }
         userRepo.save(user);
 
-        String actionType = active ? "UNLOCK_USER" : "BAN_USER";
+        String actionType = active ? LogService.ACTION_UNBAN_USER : LogService.ACTION_LOCK_USER;
         String msg = active ? "Admin " + adminName + " unlocked account [" + user.getUsername() + "]"
                 : "Admin " + adminName + " locked account [" + user.getUsername() + "]. Reason: " + reason;
-        logService.log(adminName, "USER_ACTION", actionType, user.getId(), msg);
+        logService.logAdminAction(admin, LogService.USER_MANAGEMENT, actionType, user.getId(), msg);
     }
 
     @Transactional
-    public UserResponse setUserStoragePlan(String userId, AdminSetUserStoragePlanRequest request, String adminName) {
+    public UserResponse setUserStoragePlan(String userId, AdminSetUserStoragePlanRequest request, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         if (request == null || request.getPlanId() == null || request.getPlanId().isBlank()) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
@@ -389,7 +400,7 @@ public class AdminService {
         String reason = request.getReason() != null && !request.getReason().isBlank()
                 ? request.getReason().trim()
                 : "Manual payment reconciliation";
-        logService.log(adminName, "ADMIN_ACTION", "SET_USER_STORAGE_PLAN", savedUser.getId(),
+        logService.logAdminAction(admin, LogService.USER_MANAGEMENT, "SET_USER_STORAGE_PLAN", savedUser.getId(),
                 "Admin " + adminName + " set storage plan [" + plan.getPlanName() + "] for user ["
                         + savedUser.getUsername() + "]. Reason: " + reason);
 
@@ -397,13 +408,15 @@ public class AdminService {
     }
 
     @Transactional
-    public void deleteUserAccount(String userId, String adminName) {
+    public void deleteUserAccount(String userId, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         userLoginHistoryRepo.deleteByUser(user);
         userRepo.delete(user);
 
-        logService.log(adminName, "USER_ACTION", "DELETE_USER", user.getId(),
+        logService.logAdminAction(admin, LogService.USER_MANAGEMENT, LogService.ACTION_DELETE_USER, user.getId(),
                 "Admin " + adminName + " permanently deleted account [" + user.getUsername() + "] from the database.");
     }
 
@@ -450,14 +463,16 @@ public class AdminService {
     }
 
     @Transactional
-    public void softDeleteDocument(String docId, String adminName) {
+    public void softDeleteDocument(String docId, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         Document doc = documentRepo.findById(docId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
         doc.setDeleted(true);
         doc.setDeletedAt(LocalDateTime.now());
         documentRepo.save(doc);
 
-        logService.log(adminName, "DOCUMENT_LOG", "ADMIN_DELETE_DOC", doc.getId(),
+        logService.logAdminAction(admin, LogService.DOCUMENT_MANAGEMENT, LogService.ACTION_DELETE_DOCUMENT, doc.getId(),
                 "Admin " + adminName + " removed policy-violating file [" + doc.getFileName() + "] owned by user [" + ownerUsername(doc) + "]");
     }
 
@@ -551,7 +566,9 @@ public class AdminService {
     }
 
     @Transactional // Rất quan trọng: Phải có để đảm bảo tính nguyên tử
-    public void deleteGroup(String groupId, String adminName) {
+    public void deleteGroup(String groupId, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         // 1. Kiểm tra nhóm có tồn tại không
         StudyGroup group = studyGroupRepo.findById(groupId)
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
@@ -570,11 +587,14 @@ public class AdminService {
         studyGroupRepo.flush();
 
         // 4. Ghi log
-        logService.logAction(adminName, "DELETE_GROUP", "Deleted group: " + groupName);
+        logService.logAdminAction(admin, LogService.GROUP_MANAGEMENT, LogService.ACTION_DELETE_GROUP, groupId,
+                "Admin " + adminName + " deleted group [" + groupName + "]");
     }
 
     @Transactional
-    public String updateGroupStatus(String groupId, AdminUpdateGroupStatusRequest request, String adminName) {
+    public String updateGroupStatus(String groupId, AdminUpdateGroupStatusRequest request, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         StudyGroup group = studyGroupRepo.findById(groupId)
                 .orElseThrow(() -> new AppException(ErrorCode.GROUP_NOT_FOUND));
 
@@ -584,7 +604,8 @@ public class AdminService {
         studyGroupRepo.save(group);
 
         String status = active ? "ACTIVE" : "BANNED";
-        logService.log(adminName, "ADMIN_ACTION", "UPDATE_GROUP_STATUS", group.getId(),
+        logService.logAdminAction(admin, LogService.GROUP_MANAGEMENT,
+                active ? LogService.ACTION_UNLOCK_GROUP : LogService.ACTION_LOCK_GROUP, group.getId(),
                 "Admin " + adminName + " changed group [" + group.getName() + "] status to " + status);
         return status;
     }
@@ -779,7 +800,9 @@ public class AdminService {
     }
 
     @Transactional
-    public AdminPlanResponse updatePlan(String planId, AdminUpdatePlanRequest request, String adminName) {
+    public AdminPlanResponse updatePlan(String planId, AdminUpdatePlanRequest request, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         if (request == null) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
@@ -807,7 +830,7 @@ public class AdminService {
         }
 
         StoragePlan savedPlan = storagePlanRepo.save(plan);
-        logService.log(adminName, "ADMIN_ACTION", "UPDATE_PLAN", savedPlan.getId(),
+        logService.logAdminAction(admin, LogService.SYSTEM_MANAGEMENT, "UPDATE_PLAN", savedPlan.getId(),
                 "Admin " + adminName + " updated storage plan [" + savedPlan.getPlanName() + "]");
         return toAdminPlanResponse(savedPlan, LocalDateTime.now());
     }
@@ -902,7 +925,9 @@ public class AdminService {
         return defaultSystemSettings();
     }
 
-    public SystemSettingsResponse updateSystemSettings(AdminUpdateSettingsRequest request, String adminName) {
+    public SystemSettingsResponse updateSystemSettings(AdminUpdateSettingsRequest request, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         if (request == null) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
@@ -925,7 +950,7 @@ public class AdminService {
         } catch (JsonProcessingException exception) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
-        logService.log(adminName, "ADMIN_ACTION", "UPDATE_SETTINGS", "SYSTEM",
+        logService.logAdminAction(admin, LogService.SYSTEM_MANAGEMENT, LogService.ACTION_UPDATE_SETTINGS, "SYSTEM",
                 "Admin " + adminName + " updated system settings");
         return updatedSettings;
     }
@@ -942,7 +967,9 @@ public class AdminService {
         return defaultHomepageConfig();
     }
 
-    public HomepageConfigResponse updateHomepageConfig(AdminUpdateHomepageConfigRequest request, String adminName) {
+    public HomepageConfigResponse updateHomepageConfig(AdminUpdateHomepageConfigRequest request, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
         if (request == null) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
@@ -959,7 +986,7 @@ public class AdminService {
         } catch (JsonProcessingException exception) {
             throw new AppException(ErrorCode.REQUEST_BODY_INVALID);
         }
-        logService.log(adminName, "ADMIN_ACTION", "UPDATE_HOMEPAGE_CONFIG", "SYSTEM",
+        logService.logAdminAction(admin, LogService.SYSTEM_MANAGEMENT, "UPDATE_HOMEPAGE_CONFIG", "SYSTEM",
                 "Admin " + adminName + " updated homepage configuration");
         return updatedConfig;
     }
@@ -992,6 +1019,25 @@ public class AdminService {
 
     private String firstNonBlank(String value, String fallback) {
         return value != null && !value.isBlank() ? value.trim() : fallback;
+    }
+
+    private User requireAdminActor(String actorId) {
+        if (actorId == null || actorId.isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        User actor = userRepo.findById(actorId.trim())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (!logService.isAdmin(actor)) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return actor;
+    }
+
+    private String adminDisplayName(User admin) {
+        if (admin.getUsername() != null && !admin.getUsername().isBlank()) {
+            return admin.getUsername();
+        }
+        return admin.getId();
     }
 
     private String refreshTokenKey(String userId) {
