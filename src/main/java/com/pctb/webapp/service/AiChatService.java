@@ -79,6 +79,7 @@ public class AiChatService {
     private final AiChatConversationDocumentRepo aiChatConversationDocumentRepo;
     private final AiChatMessageRepo aiChatMessageRepo;
     private final UserRepo userRepo;
+    private final AiQuotaService aiQuotaService;
 
     @Value("${gemini.api-key}")
     private String apiKey;
@@ -98,7 +99,8 @@ public class AiChatService {
             AiChatConversationRepo aiChatConversationRepo,
             AiChatConversationDocumentRepo aiChatConversationDocumentRepo,
             AiChatMessageRepo aiChatMessageRepo,
-            UserRepo userRepo
+            UserRepo userRepo,
+            AiQuotaService aiQuotaService
     ) {
         this.documentTextExtractorService = documentTextExtractorService;
         this.documentRepo = documentRepo;
@@ -109,6 +111,7 @@ public class AiChatService {
         this.aiChatConversationDocumentRepo = aiChatConversationDocumentRepo;
         this.aiChatMessageRepo = aiChatMessageRepo;
         this.userRepo = userRepo;
+        this.aiQuotaService = aiQuotaService;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(15));
         requestFactory.setReadTimeout(Duration.ofSeconds(120));
@@ -120,8 +123,14 @@ public class AiChatService {
         this.jsonMapper = JsonMapper.builder().build();
     }
 
-    public String chat(String message) {
-        return generate(message);
+    public String chat(String message, JwtAuthenticationToken authentication) {
+        User currentUser = getCurrentUser(authentication);
+        aiQuotaService.validateCanChat(currentUser.getId());
+
+        GeminiResult result = generate(message);
+        recordChatUsage(currentUser.getId(), "CHAT", result);
+
+        return result.answer();
     }
 
     // Luồng chat AI theo tài liệu đã lưu của user.
@@ -134,6 +143,7 @@ public class AiChatService {
         // Lấy user hiện tại để khóa quyền truy cập và retrieval theo owner.
         User currentUser = getCurrentUser(authentication);
         String userId = currentUser.getId();
+        aiQuotaService.validateCanChat(userId);
         AiChatConversation conversation = resolveConversation(request.getConversationId(), userId);
         AiKnowledgeChatRequest effectiveRequest = buildEffectiveKnowledgeRequest(request, conversation);
         Document inferredDocument = resolveDocumentFromMessage(effectiveRequest.getMessage(), userId);
@@ -171,7 +181,9 @@ public class AiChatService {
         AiDocumentChatResponse response;
         if (hasRelevantContext(retrievedChunks, scope)
                 || hasRelevantConversationContext(retrievedChunks, conversation, scope)) {
-            String answer = generateDocumentGroundedAnswer(effectiveRequest.getMessage(), retrievedChunks);
+            GeminiResult result = generateDocumentGroundedAnswer(effectiveRequest.getMessage(), retrievedChunks);
+            recordChatUsage(userId, "KNOWLEDGE_CHAT", result);
+            String answer = result.answer();
             if (isAiTemporaryFailure(answer)) {
                 answer = buildFallbackAnswerFromSources(retrievedChunks);
             }
@@ -790,7 +802,7 @@ public class AiChatService {
                 """.formatted(userMessage, context);
     }
 
-    private String generateDocumentGroundedAnswer(
+    private GeminiResult generateDocumentGroundedAnswer(
             String userMessage,
             List<AiRetrievedChunk> retrievedChunks
     ) {
@@ -963,28 +975,35 @@ public class AiChatService {
                 .orElseThrow(() -> new AppException(ErrorCode.FOLDER_NOT_FOUND));
     }
 
-    public String chatWithFile(String message, MultipartFile file) {
+    public String chatWithFile(String message, MultipartFile file, JwtAuthenticationToken authentication) {
+        User currentUser = getCurrentUser(authentication);
+        aiQuotaService.validateCanChat(currentUser.getId());
+
         String extension = documentTextExtractorService.validateSupportedFileAndGetExtension(file);
+        GeminiResult result;
         if ("pdf".equals(extension)) {
-            return generateWithInlinePdf(message, file);
+            result = generateWithInlinePdf(message, file);
+        } else {
+            String fileText = documentTextExtractorService.extractForAi(file);
+            String prompt = """
+                    Noi dung file:
+                    %s
+
+                    Cau hoi cua nguoi dung:
+                    %s
+
+                    Yeu cau:
+                    Chi tra loi dua tren noi dung file. Neu file khong co thong tin lien quan, hay noi: Toi khong tim thay thong tin trong file.
+                    """.formatted(fileText, message);
+
+            result = generate(prompt);
         }
 
-        String fileText = documentTextExtractorService.extractForAi(file);
-        String prompt = """
-                Noi dung file:
-                %s
-
-                Cau hoi cua nguoi dung:
-                %s
-
-                Yeu cau:
-                Chi tra loi dua tren noi dung file. Neu file khong co thong tin lien quan, hay noi: Toi khong tim thay thong tin trong file.
-                """.formatted(fileText, message);
-
-        return generate(prompt);
+        recordChatUsage(currentUser.getId(), "CHAT_WITH_FILE", result);
+        return result.answer();
     }
 
-    private String generateWithInlinePdf(String message, MultipartFile file) {
+    private GeminiResult generateWithInlinePdf(String message, MultipartFile file) {
         String encodedPdf;
         try {
             encodedPdf = Base64.getEncoder().encodeToString(file.getBytes());
@@ -1026,7 +1045,7 @@ public class AiChatService {
         return executeGeminiRequest(requestBody);
     }
 
-    private String generate(String message) {
+    private GeminiResult generate(String message) {
         Map<String, Object> requestBody = Map.of(
                 "system_instruction", Map.of(
                         "parts", new Object[]{
@@ -1049,11 +1068,11 @@ public class AiChatService {
         return executeGeminiRequest(requestBody);
     }
 
-    private String executeGeminiRequest(Map<String, Object> requestBody) {
+    private GeminiResult executeGeminiRequest(Map<String, Object> requestBody) {
         return executeGeminiRequestWithRetry(requestBody, model);
     }
 
-    private String executeGeminiRequestWithRetry(
+    private GeminiResult executeGeminiRequestWithRetry(
             Map<String, Object> requestBody,
             String targetModel
     ) {
@@ -1063,22 +1082,22 @@ public class AiChatService {
             } catch (HttpServerErrorException.ServiceUnavailable exception) {
                 log.warn("Gemini returned 503 on attempt {}/{} for model {}", attempt, GEMINI_MAX_RETRIES, targetModel);
                 if (attempt == GEMINI_MAX_RETRIES) {
-                    return AI_BUSY_MESSAGE;
+                    return GeminiResult.failure(AI_BUSY_MESSAGE);
                 }
                 sleepBeforeRetry(attempt);
             } catch (HttpServerErrorException exception) {
                 log.error("Gemini server error {} for model {}", exception.getStatusCode(), targetModel, exception);
-                return AI_UNAVAILABLE_MESSAGE;
+                return GeminiResult.failure(AI_UNAVAILABLE_MESSAGE);
             } catch (ResourceAccessException exception) {
                 log.error("Gemini request failed due to network or timeout issue for model {}", targetModel, exception);
-                return AI_UNAVAILABLE_MESSAGE;
+                return GeminiResult.failure(AI_UNAVAILABLE_MESSAGE);
             }
         }
 
-        return AI_BUSY_MESSAGE;
+        return GeminiResult.failure(AI_BUSY_MESSAGE);
     }
 
-    private String executeGeminiRequestOnce(
+    private GeminiResult executeGeminiRequestOnce(
             Map<String, Object> requestBody,
             String targetModel
     ) {
@@ -1091,17 +1110,47 @@ public class AiChatService {
                 .body(String.class);
 
         if (responseBody == null || responseBody.isBlank()) {
-            return "";
+            return GeminiResult.failure("");
         }
 
         JsonNode response = jsonMapper.readTree(responseBody);
-        return response.path("candidates")
+        String answer = response.path("candidates")
                 .path(0)
                 .path("content")
                 .path("parts")
                 .path(0)
                 .path("text")
                 .asString();
+
+        JsonNode usage = response.path("usageMetadata");
+        return new GeminiResult(
+                answer,
+                usage.path("promptTokenCount").asInt(0),
+                usage.path("candidatesTokenCount").asInt(0),
+                usage.path("totalTokenCount").asInt(0)
+        );
+    }
+
+    private void recordChatUsage(String userId, String feature, GeminiResult result) {
+        aiQuotaService.recordUsage(
+                userId,
+                model,
+                feature,
+                result.promptTokens(),
+                result.outputTokens(),
+                result.totalTokens()
+        );
+    }
+
+    private record GeminiResult(
+            String answer,
+            int promptTokens,
+            int outputTokens,
+            int totalTokens
+    ) {
+        private static GeminiResult failure(String answer) {
+            return new GeminiResult(answer, 0, 0, 0);
+        }
     }
 
     private void sleepBeforeRetry(int attempt) {
