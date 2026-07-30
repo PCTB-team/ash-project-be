@@ -672,12 +672,7 @@ public class AdminService {
         Page<com.pctb.webapp.entity.Transaction> transactionPage;
 
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
-            TransactionStatus transactionStatus;
-            try {
-                transactionStatus = TransactionStatus.valueOf(status.trim().toUpperCase());
-            } catch (IllegalArgumentException exception) {
-                throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
-            }
+            TransactionStatus transactionStatus = normalizeTransactionStatusFilter(status);
             transactionPage = transactionRepo.findByStatus(transactionStatus, pageable);
         } else {
             transactionPage = transactionRepo.findAll(pageable);
@@ -693,6 +688,17 @@ public class AdminService {
                 .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
                 .createdAt(tx.getCreatedAt())
                 .build());
+    }
+
+    private TransactionStatus normalizeTransactionStatusFilter(String status) {
+        return switch (status.trim().toUpperCase()) {
+            case "PAID", "SUCCESS" -> TransactionStatus.SUCCESS;
+            case "CANCELED", "CANCELLED" -> TransactionStatus.CANCELLED;
+            case "EXPIRED", "TIMEOUT" -> TransactionStatus.TIMEOUT;
+            case "PENDING" -> TransactionStatus.PENDING;
+            case "FAILED" -> TransactionStatus.FAILED;
+            default -> throw new AppException(ErrorCode.REQUEST_PARAMETER_INVALID);
+        };
     }
 
     @Transactional(readOnly = true)
