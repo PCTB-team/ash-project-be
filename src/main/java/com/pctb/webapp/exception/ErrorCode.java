@@ -302,6 +302,8 @@ public enum ErrorCode {
 
     INVALID_SIGNATURE(1507, "Chữ ký của webhook không hợp lệ", HttpStatus.UNAUTHORIZED),
 
+    AI_QUOTA_EXCEEDED(1601, "Ban da su dung het quota AI hom nay", HttpStatus.TOO_MANY_REQUESTS),
+
     PLAN_LEVEL_LOW(1508, "Bạn không thể hạ cấp hoặc mua gói có cấp độ thấp hơn hay bằng cấp độ lưu trữ hiện tại", HttpStatus.BAD_REQUEST);
 
     private final int code;

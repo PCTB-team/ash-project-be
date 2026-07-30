@@ -5,10 +5,12 @@ import com.pctb.webapp.dto.request.AiKnowledgeChatRequest;
 import com.pctb.webapp.dto.response.AiChatConversationPageResponse;
 import com.pctb.webapp.dto.response.AiChatHistoryPageResponse;
 import com.pctb.webapp.dto.response.AiChatMessageListResponse;
+import com.pctb.webapp.dto.response.AiQuotaResponse;
 import com.pctb.webapp.dto.response.AiDocumentChatResponse;
 import com.pctb.webapp.dto.response.AiChatResponse;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.service.AiChatService;
+import com.pctb.webapp.service.AiQuotaService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -35,15 +37,28 @@ import org.springframework.web.multipart.MultipartFile;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AiChatController {
     AiChatService aiChatService;
+    AiQuotaService aiQuotaService;
 
     @Operation(summary = "Chat with AI assistant")
     @PostMapping("/chat")
-    public ApiResponse<AiChatResponse> chat(@RequestBody @Valid AiChatRequest request) {
+    public ApiResponse<AiChatResponse> chat(
+            @RequestBody @Valid AiChatRequest request,
+            JwtAuthenticationToken authentication
+    ) {
         return ApiResponse.<AiChatResponse>builder()
                 .message("Chat with AI successfully")
                 .result(AiChatResponse.builder()
-                        .answer(aiChatService.chat(request.getMessage()))
+                        .answer(aiChatService.chat(request.getMessage(), authentication))
                         .build())
+                .build();
+    }
+
+    @Operation(summary = "Get current user's AI quota")
+    @GetMapping("/quota/me")
+    public ApiResponse<AiQuotaResponse> getMyAiQuota(JwtAuthenticationToken authentication) {
+        return ApiResponse.<AiQuotaResponse>builder()
+                .message("Get AI quota successfully")
+                .result(aiQuotaService.getQuota(authentication.getName()))
                 .build();
     }
 
@@ -109,12 +124,13 @@ public class AiChatController {
                             schema = @Schema(type = "string", format = "binary")
                     )
             )
-            @RequestPart("file") MultipartFile file
+            @RequestPart("file") MultipartFile file,
+            JwtAuthenticationToken authentication
     ) {
         return ApiResponse.<AiChatResponse>builder()
                 .message("Chat with file successfully")
                 .result(AiChatResponse.builder()
-                        .answer(aiChatService.chatWithFile(message, file))
+                        .answer(aiChatService.chatWithFile(message, file, authentication))
                         .build())
                 .build();
     }
