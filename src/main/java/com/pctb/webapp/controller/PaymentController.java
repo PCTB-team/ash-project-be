@@ -3,6 +3,7 @@ package com.pctb.webapp.controller;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pctb.webapp.dto.response.ApiResponse;
 import com.pctb.webapp.dto.response.CheckoutResponse;
+import com.pctb.webapp.dto.response.PaymentResultResponse;
 import com.pctb.webapp.entity.Transaction;
 import com.pctb.webapp.entity.TransactionStatus;
 import com.pctb.webapp.exception.AppException;
@@ -97,5 +98,16 @@ public class PaymentController {
     public ApiResponse<TransactionStatus> status(@PathVariable String id) {
         Transaction tx = paymentService.getTransactionStatus(id);
         return ApiResponse.<TransactionStatus>builder().result(tx.getStatus()).build();
+    }
+
+    @GetMapping("/callback")
+    public ApiResponse<PaymentResultResponse> callback(
+            @RequestParam Long orderCode,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String code
+    ) {
+        return ApiResponse.<PaymentResultResponse>builder()
+                .result(paymentService.processPaymentCallback(orderCode, status, code))
+                .build();
     }
 }

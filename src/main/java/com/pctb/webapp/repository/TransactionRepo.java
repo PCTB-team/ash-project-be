@@ -26,5 +26,9 @@ public interface TransactionRepo extends JpaRepository<Transaction, String> {
      */
     Optional<Transaction> findByOrderCode(Long orderCode);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Transaction t WHERE t.orderCode = :orderCode")
+    Optional<Transaction> findByOrderCodeForUpdate(@Param("orderCode") Long orderCode);
+
     Page<Transaction> findByStatus(TransactionStatus status, Pageable pageable);
 }
