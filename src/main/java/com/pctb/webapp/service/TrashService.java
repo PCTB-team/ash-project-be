@@ -36,6 +36,7 @@ public class TrashService {
     StorageService storageService;
     QdrantService qdrantService;
     DocumentIndexingService documentIndexingService;
+    DocumentTextExtractorService documentTextExtractorService;
 
     public TrashResponse getMyTrash(JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
@@ -144,7 +145,7 @@ public class TrashService {
 
             restoreDocument(document, restoredAt);
             updateParentSizeCascade(document.getFolder(), safeFileSize(document), restoredAt);
-            documentIndexingService.indexDocument(document.getId());
+            indexDocumentIfSupported(document);
             restoredDocuments++;
         }
 
@@ -250,7 +251,7 @@ public class TrashService {
             }
 
             restoreDocument(document, restoredAt);
-            documentIndexingService.indexDocument(document.getId());
+            indexDocumentIfSupported(document);
             restoredDocuments++;
         }
 
@@ -278,6 +279,12 @@ public class TrashService {
         document.setDeletedAt(null);
         document.setUpdatedAt(restoredAt);
         documentRepo.save(document);
+    }
+
+    private void indexDocumentIfSupported(Document document) {
+        if (documentTextExtractorService.supportsIndexing(document.getFileName())) {
+            documentIndexingService.indexDocument(document.getId());
+        }
     }
 
     private void updateParentSizeCascade(Folder folder, long delta, LocalDateTime updatedAt) {

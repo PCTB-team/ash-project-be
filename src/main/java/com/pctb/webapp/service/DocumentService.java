@@ -53,6 +53,8 @@ public class DocumentService {
 
     DocumentIndexingService documentIndexingService;
 
+    DocumentTextExtractorService documentTextExtractorService;
+
     // Lấy toàn bộ tài liệu active của user hiện tại, sắp xếp theo thời gian tạo mới nhất.
     public List<DocumentResponse> getMyDocuments(JwtAuthenticationToken authentication) {
         String userId = authentication.getName();
@@ -276,7 +278,7 @@ public class DocumentService {
         }
 
         if (!Boolean.TRUE.equals(document.getDeleted())) {
-            throw new AppException(ErrorCode.DOCUMENT_NOT_IN_TRASH);
+            return buildDocumentResponse(document);
         }
 
         document.setDeleted(false);
@@ -285,7 +287,9 @@ public class DocumentService {
         updateFolderSizeCascade(document.getFolder(), safeFileSize(document));
 
         document = documentRepo.save(document);
-        documentIndexingService.indexDocument(document.getId());
+        if (documentTextExtractorService.supportsIndexing(document.getFileName())) {
+            documentIndexingService.indexDocument(document.getId());
+        }
 
         return buildDocumentResponse(document);
     }
