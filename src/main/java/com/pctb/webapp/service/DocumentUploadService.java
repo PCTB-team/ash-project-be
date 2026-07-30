@@ -88,44 +88,49 @@ public class DocumentUploadService {
         String storageUrl = storageService.upload(file, storedFileName);
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        Document document = Document.builder()
-                .title(originalFileName)
-                .fileName(originalFileName)
-                .fileExtension(extension)
-                .mimeType(realMimeType)
-                .fileSize(file.getSize())
-                .storageUrl(storageUrl)
-                .status(UploadStatus.COMPLETED)
-                .owner(owner)
-                .folder(folder)
-                .createdAt(now)
-                .updatedAt(now)
-                .deleted(false)
-                .build();
-
-        document = documentRepo.save(document);
-
-        if (documentTextExtractorService.supportsIndexing(originalFileName)) {
-            try {
-                documentIndexingService.indexDocument(document.getId());
-            } catch (Exception exception) {
-                qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
-                storageService.delete(document.getStorageUrl());
-                documentRepo.delete(document);
-                throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
-            }
-        }
-
+        Document document;
         if (existingDocument != null) {
+            String oldStorageUrl = existingDocument.getStorageUrl();
             qdrantService.deleteDocumentChunks(owner.getId(), existingDocument.getId());
-            storageService.delete(existingDocument.getStorageUrl());
-            if (!Boolean.TRUE.equals(existingDocument.getDeleted())) {
-                updateFolderSizeCascade(existingDocument.getFolder(), -safeFileSize(existingDocument));
-            }
-            documentRepo.delete(existingDocument);
+
+            existingDocument.setTitle(originalFileName);
+            existingDocument.setFileName(originalFileName);
+            existingDocument.setFileExtension(extension);
+            existingDocument.setMimeType(realMimeType);
+            existingDocument.setFileSize(file.getSize());
+            existingDocument.setStorageUrl(storageUrl);
+            existingDocument.setStatus(UploadStatus.COMPLETED);
+            existingDocument.setFolder(folder);
+            existingDocument.setCreatedAt(now);
+            existingDocument.setUpdatedAt(now);
+            existingDocument.setDeleted(false);
+            existingDocument.setDeletedAt(null);
+            document = documentRepo.save(existingDocument);
+
+            indexDocumentIfSupported(document, owner, true);
+            storageService.delete(oldStorageUrl);
+            updateFolderSizeCascade(folder, file.getSize() - replacedFileSize);
+        } else {
+            document = Document.builder()
+                    .title(originalFileName)
+                    .fileName(originalFileName)
+                    .fileExtension(extension)
+                    .mimeType(realMimeType)
+                    .fileSize(file.getSize())
+                    .storageUrl(storageUrl)
+                    .status(UploadStatus.COMPLETED)
+                    .owner(owner)
+                    .folder(folder)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .deleted(false)
+                    .build();
+
+            document = documentRepo.save(document);
+            indexDocumentIfSupported(document, owner, false);
+            updateFolderSizeCascade(folder, file.getSize());
         }
 
-        updateFolderSizeCascade(folder, file.getSize());
         logService.log(
                 owner.getUsername(),
                 "DOCUMENT_LOG",
@@ -151,6 +156,23 @@ public class DocumentUploadService {
     }
 
     // Tìm folder đích theo id và user; nếu folderId null thì upload vào thư mục gốc.
+    private void indexDocumentIfSupported(Document document, User owner, boolean replaceExisting) {
+        if (!documentTextExtractorService.supportsIndexing(document.getFileName())) {
+            return;
+        }
+
+        try {
+            documentIndexingService.indexDocument(document.getId());
+        } catch (Exception exception) {
+            qdrantService.deleteDocumentChunks(owner.getId(), document.getId());
+            storageService.delete(document.getStorageUrl());
+            if (!replaceExisting) {
+                documentRepo.delete(document);
+            }
+            throw new AppException(ErrorCode.DOCUMENT_INDEXING_FAILED);
+        }
+    }
+
     private Folder resolveFolder(String folderId, String userId) {
         if (folderId == null) {
             return null;

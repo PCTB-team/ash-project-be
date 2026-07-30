@@ -823,10 +823,10 @@ public class AiChatService {
                 .collect(Collectors.joining("\n\n"));
 
         if (!hasText(extractedContent)) {
-            return "Da tim thay tai lieu lien quan, nhung AI tam thoi khong kha dung de tong hop cau tra loi.";
+            return "Đã tìm thấy tài liệu liên quan, nhưng AI tạm thời không khả dụng để tổng hợp câu trả lời.";
         }
 
-        return "Da tim thay tai lieu lien quan, nhung AI tam thoi khong kha dung. Noi dung trich xuat:\n\n"
+        return "Đã tìm thấy tài liệu liên quan, nhưng AI tạm thời không khả dụng. Nội dung trích xuất:\n\n"
                 + extractedContent;
     }
 
