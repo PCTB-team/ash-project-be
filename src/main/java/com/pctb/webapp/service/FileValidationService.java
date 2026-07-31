@@ -51,7 +51,13 @@ public class FileValidationService {
             Map.entry("jpeg", Set.of("image/jpeg")),
             Map.entry("png", Set.of("image/png")),
             Map.entry("zip", Set.of("application/zip", "application/x-zip-compressed")),
-            Map.entry("rar", Set.of("application/vnd.rar", "application/x-rar-compressed")),
+            Map.entry("rar", Set.of(
+                    "application/vnd.rar",
+                    "application/x-rar-compressed",
+                    "application/x-rar",
+                    "application/x-compressed",
+                    "application/octet-stream"
+            )),
             Map.entry("svg", Set.of("image/svg+xml")),
             Map.entry("md", Set.of("text/markdown", "text/x-markdown", "text/plain")),
             Map.entry("mp3", Set.of("audio/mpeg")),
@@ -79,7 +85,8 @@ public class FileValidationService {
 
         String realMimeType = detectRealMimeType(file);
 
-        if (!ALLOWED_MIME_TYPES.get(extension).contains(realMimeType)) {
+        if (!ALLOWED_MIME_TYPES.get(extension).contains(realMimeType)
+                && !hasAllowedArchiveSignature(extension, file)) {
             throw new AppException(ErrorCode.INVALID_MIME_TYPE);
         }
 
@@ -103,6 +110,26 @@ public class FileValidationService {
         try (TikaInputStream inputStream = TikaInputStream.get(file.getInputStream())) {
             MediaType mediaType = tikaConfig.getDetector().detect(inputStream, metadata);
             return mediaType.toString();
+        } catch (IOException exception) {
+            throw new AppException(ErrorCode.INVALID_MIME_TYPE);
+        }
+    }
+
+    private boolean hasAllowedArchiveSignature(String extension, MultipartFile file) {
+        return "rar".equals(extension) && hasRarSignature(file);
+    }
+
+    private boolean hasRarSignature(MultipartFile file) {
+        try (var inputStream = file.getInputStream()) {
+            byte[] header = inputStream.readNBytes(8);
+            return header.length >= 7
+                    && header[0] == 0x52
+                    && header[1] == 0x61
+                    && header[2] == 0x72
+                    && header[3] == 0x21
+                    && header[4] == 0x1A
+                    && header[5] == 0x07
+                    && (header[6] == 0x00 || header[6] == 0x01);
         } catch (IOException exception) {
             throw new AppException(ErrorCode.INVALID_MIME_TYPE);
         }
