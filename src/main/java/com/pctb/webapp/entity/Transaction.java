@@ -44,4 +44,5 @@ public class Transaction {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime expiredAt;
 }

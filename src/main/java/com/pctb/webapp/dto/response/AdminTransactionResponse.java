@@ -18,4 +18,5 @@ public class AdminTransactionResponse {
     long amount;          // Số tiền nạp (VND)
     String status;        // Trạng thái (SUCCESS, PENDING, FAILED)
     LocalDateTime createdAt; // Ngày thực hiện giao dịch
+    LocalDateTime expiredAt;
 }

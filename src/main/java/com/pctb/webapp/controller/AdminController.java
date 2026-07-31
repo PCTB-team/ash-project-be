@@ -48,13 +48,10 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String logType,
-            @RequestParam(required = false) String actor,
-            @RequestParam(defaultValue = "false") boolean currentAdminOnly,
-            @AuthenticationPrincipal Jwt jwt
+            @RequestParam(required = false) String actor
     ) {
-        String resolvedActor = currentAdminOnly && jwt != null ? currentActorId(jwt) : actor;
         return ApiResponse.<Page<SystemLog>>builder()
-                .result(adminService.getSystemAuditLogsPaged(page, size, logType, resolvedActor))
+                .result(adminService.getSystemAuditLogsPaged(page, size, logType, actor))
                 .build();
     }
 
@@ -107,6 +104,19 @@ public class AdminController {
         return ApiResponse.<UserResponse>builder()
                 .message("User storage plan updated successfully")
                 .result(adminService.setUserStoragePlan(userId, request, currentActorId(jwt)))
+                .build();
+    }
+
+    @Operation(summary = "Page 2: Remove a manually assigned storage plan from a user")
+    @DeleteMapping("/users/{userId}/storage-plan")
+    public ApiResponse<UserResponse> removeUserStoragePlan(
+            @PathVariable String userId,
+            @RequestParam(required = false) String reason,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.<UserResponse>builder()
+                .message("User storage plan removed successfully")
+                .result(adminService.removeUserStoragePlan(userId, reason, currentActorId(jwt)))
                 .build();
     }
 

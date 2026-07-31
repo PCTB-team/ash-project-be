@@ -13,6 +13,7 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.v2.paymentRequests.PaymentLinkItem;
 import vn.payos.model.webhooks.WebhookData;
 
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -51,6 +52,7 @@ public class PayOSService {
                     .returnUrl("https://ash-project-fe.vercel.app/payment/success")
                     .cancelUrl("https://ash-project-fe.vercel.app/payment/cancel")
                     .items(List.of(item))
+                    .expiredAt(toEpochSecond(tx))
                     .build();
 
             return payOS.paymentRequests().create(request);
@@ -61,6 +63,12 @@ public class PayOSService {
 
             throw new AppException(ErrorCode.PAYMENT_GATEWAY_ERROR);
         }
+    }
+
+    private Long toEpochSecond(Transaction tx) {
+        return tx.getExpiredAt() == null
+                ? null
+                : tx.getExpiredAt().atZone(ZoneId.systemDefault()).toEpochSecond();
     }
 
     // =========================

@@ -7,9 +7,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -31,4 +33,15 @@ public interface TransactionRepo extends JpaRepository<Transaction, String> {
     Optional<Transaction> findByOrderCodeForUpdate(@Param("orderCode") Long orderCode);
 
     Page<Transaction> findByStatus(TransactionStatus status, Pageable pageable);
+
+    @Modifying
+    @Query("""
+            UPDATE Transaction t
+            SET t.status = com.pctb.webapp.entity.TransactionStatus.TIMEOUT,
+                t.updatedAt = :now
+            WHERE t.status = com.pctb.webapp.entity.TransactionStatus.PENDING
+              AND t.expiredAt IS NOT NULL
+              AND t.expiredAt <= :now
+            """)
+    int markExpiredPendingTransactions(@Param("now") LocalDateTime now);
 }

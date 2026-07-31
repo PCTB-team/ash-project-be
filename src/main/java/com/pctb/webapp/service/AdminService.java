@@ -39,6 +39,7 @@ public class AdminService {
     GroupFileRepo groupFileRepo;
     GroupMessageRepo groupMessageRepo;
     TransactionRepo transactionRepo;
+    PaymentService paymentService;
     StoragePlanRepo storagePlanRepo;
     UserLoginHistoryRepo userLoginHistoryRepo;
     SystemLogRepo systemLogRepo;
@@ -52,6 +53,7 @@ public class AdminService {
     static String ADMIN_HOMEPAGE_CONFIG_KEY = "admin:homepage:config";
     static String ADMIN_PLAN_STATUS_PREFIX = "admin:plan:status:";
     static String ADMIN_PLAN_FEATURES_PREFIX = "admin:plan:features:";
+    static long DEFAULT_USER_STORAGE_BYTES = 524288000L;
 
     // =========================================================================
     // 📊 TRANG 1: LOGIC DASHBOARD TỔNG QUAN (Đồng bộ Stat Cards, Charts, Hoạt động gần đây)
@@ -408,6 +410,32 @@ public class AdminService {
     }
 
     @Transactional
+    public UserResponse removeUserStoragePlan(String userId, String reason, String adminId) {
+        User admin = requireAdminActor(adminId);
+        String adminName = adminDisplayName(admin);
+        User user = userRepo.findByIdForUpdate(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setStorageQuota(resolveDefaultUserStorage());
+        user.setStorageExpiredAt(null);
+
+        User savedUser = userRepo.save(user);
+        String cleanReason = reason != null && !reason.isBlank()
+                ? reason.trim()
+                : "Manual package removal";
+        logService.logAdminAction(admin, LogService.USER_MANAGEMENT, "REMOVE_USER_STORAGE_PLAN", savedUser.getId(),
+                "Admin " + adminName + " removed storage plan for user ["
+                        + savedUser.getUsername() + "]. Reason: " + cleanReason);
+
+        return toAdminUserResponse(savedUser);
+    }
+
+    private long resolveDefaultUserStorage() {
+        Long defaultUserStorage = getSystemSettings().getDefaultUserStorage();
+        return defaultUserStorage != null ? defaultUserStorage : DEFAULT_USER_STORAGE_BYTES;
+    }
+
+    @Transactional
     public void deleteUserAccount(String userId, String adminId) {
         User admin = requireAdminActor(adminId);
         String adminName = adminDisplayName(admin);
@@ -666,8 +694,9 @@ public class AdminService {
     // =========================================================================
     // 💳 TRANG 5: QUẢN LÝ THANH TOÁN & DOANH THU (Ánh xạ AdminTransactionResponse)
     // =========================================================================
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<AdminTransactionResponse> getAllPaymentsPaged(int page, int size, String status) {
+        paymentService.markExpiredPendingTransactions();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<com.pctb.webapp.entity.Transaction> transactionPage;
 
@@ -687,6 +716,7 @@ public class AdminService {
                 .amount(tx.getAmount() != null ? tx.getAmount() : 0L)
                 .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
                 .createdAt(tx.getCreatedAt())
+                .expiredAt(tx.getExpiredAt())
                 .build());
     }
 
