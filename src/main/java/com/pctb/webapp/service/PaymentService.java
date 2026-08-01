@@ -12,6 +12,7 @@ import com.pctb.webapp.repository.TransactionRepo;
 import com.pctb.webapp.repository.UserRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,9 @@ public class PaymentService {
     private final TransactionRepo transactionRepo;
     private final UserRepo userRepo;
     private final StoragePlanRepo storagePlanRepo;
+
+    @Value("${app.payment.checkout-expiry-seconds:30}")
+    private long checkoutExpirySeconds = 30;
 
     @Transactional
     public Transaction createPaymentIntent(String userId, String planId, String idempotencyKey) {
@@ -47,6 +51,7 @@ public class PaymentService {
             throw new AppException(ErrorCode.PLAN_LEVEL_LOW);
         }
 
+        LocalDateTime now = LocalDateTime.now();
         Transaction transaction = Transaction.builder()
                 .id(UUID.randomUUID().toString())
                 .orderCode(System.currentTimeMillis())
@@ -56,7 +61,8 @@ public class PaymentService {
                 .quotaAdded(plan.getQuotaSize())
                 .status(TransactionStatus.PENDING)
                 .idempotencyKey(idempotencyKey)
-                .createdAt(LocalDateTime.now())
+                .createdAt(now)
+                .expiredAt(now.plusSeconds(checkoutExpirySeconds))
                 .build();
 
         return transactionRepo.save(transaction);
@@ -126,6 +132,9 @@ public class PaymentService {
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
         CallbackStatus callbackStatus = resolveCallbackStatus(gatewayStatus, gatewayCode);
+        if (callbackStatus == CallbackStatus.UNKNOWN && isExpired(tx)) {
+            callbackStatus = CallbackStatus.EXPIRED;
+        }
         boolean planGranted = false;
 
         if (callbackStatus == CallbackStatus.SUCCESS && tx.getStatus() == TransactionStatus.PENDING) {
@@ -234,9 +243,25 @@ public class PaymentService {
         };
     }
 
+    @Transactional
     public Transaction getTransactionStatus(String transactionId) {
-        return transactionRepo.findById(transactionId)
+        Transaction tx = transactionRepo.findById(transactionId)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+        if (isExpired(tx)) {
+            updateTransactionStatus(tx, TransactionStatus.TIMEOUT);
+        }
+        return tx;
+    }
+
+    @Transactional
+    public int markExpiredPendingTransactions() {
+        return transactionRepo.markExpiredPendingTransactions(LocalDateTime.now());
+    }
+
+    private boolean isExpired(Transaction tx) {
+        return tx.getStatus() == TransactionStatus.PENDING
+                && tx.getExpiredAt() != null
+                && !tx.getExpiredAt().isAfter(LocalDateTime.now());
     }
 
     private void validateUserRole(User user) {

@@ -48,12 +48,13 @@ public class PaymentController {
         CreatePaymentLinkResponse res = payOSService.createPaymentLink(tx);
 
         return ApiResponse.<CheckoutResponse>builder()
-                .result(new CheckoutResponse(
-                        tx.getId(),
-                        res.getCheckoutUrl(),
-                        res.getAmount().longValue(),
-                        res.getOrderCode()
-                ))
+                .result(CheckoutResponse.builder()
+                        .transactionId(tx.getId())
+                        .checkoutUrl(res.getCheckoutUrl())
+                        .amount(res.getAmount().longValue())
+                        .orderCode(res.getOrderCode())
+                        .expiredAt(tx.getExpiredAt())
+                        .build())
                 .build();
     }
 

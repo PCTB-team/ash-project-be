@@ -161,6 +161,20 @@ class PaymentServiceStatusTest {
         verify(userRepo, never()).save(tx.getUser());
     }
 
+    @Test
+    void missingStatusMarksExpiredPendingTransactionAsTimeout() {
+        Transaction tx = pendingTransaction();
+        tx.setExpiredAt(LocalDateTime.now().minusMinutes(1));
+        when(transactionRepo.findByOrderCodeForUpdate(123L)).thenReturn(Optional.of(tx));
+
+        PaymentResultResponse response = paymentService.processPaymentCallback(123L, null, null);
+
+        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.TIMEOUT);
+        assertThat(response.getStatus()).isEqualTo("EXPIRED");
+        assertThat(response.isPlanGranted()).isFalse();
+        verify(userRepo, never()).save(tx.getUser());
+    }
+
     private Transaction pendingTransaction() {
         User user = User.builder()
                 .id("user-1")
@@ -183,6 +197,7 @@ class PaymentServiceStatusTest {
                 .quotaAdded(plan.getQuotaSize())
                 .status(TransactionStatus.PENDING)
                 .createdAt(LocalDateTime.now())
+                .expiredAt(LocalDateTime.now().plusSeconds(30))
                 .build();
     }
 }
