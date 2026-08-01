@@ -100,8 +100,9 @@ public class UserService {
         String newAvatarUrl = CloudinaryStorageService.saveAvatar(userId, request.getAvatar());
 
         if (hasText(request.getFullname())) {
-            validateFullname(request.getFullname());
-            user.setFullname(request.getFullname().trim());
+            String normalizedFullname = request.getFullname().trim();
+            validateFullname(normalizedFullname, user.getUsername());
+            user.setFullname(normalizedFullname);
         }
 
         if (request.getSchool() != null) {
@@ -160,8 +161,12 @@ public class UserService {
     }
 
     // Kiểm tra fullname không được rỗng và không vượt quá độ dài cho phép.
-    private void validateFullname(String fullname) {
+    private void validateFullname(String fullname, String username) {
         if (fullname == null || fullname.isBlank() || fullname.length() > 100) {
+            throw new AppException(ErrorCode.PROFILE_FULLNAME_INVALID);
+        }
+
+        if (username != null && fullname.equalsIgnoreCase(username.trim())) {
             throw new AppException(ErrorCode.PROFILE_FULLNAME_INVALID);
         }
     }
